@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 import click
+import sys
 from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
@@ -121,6 +122,11 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
 
 if __name__ == '__main__':
     try:
-        cli()
+        default_map = {}
+        if not sys.stdin.isatty():
+            for command, arg_name in (("convert-srt", "input_file"), ("sort", "input_file"), ("tpp", "input_file")):
+                default_map[command] = {arg_name: '-'}
+
+        cli(default_map=default_map)
     except PrassError as e:
         click.echo(e.message)
