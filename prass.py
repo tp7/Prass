@@ -1,7 +1,5 @@
 #!/usr/bin/env python2
 import click
-import re
-from collections import namedtuple
 from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
