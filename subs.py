@@ -1,0 +1,233 @@
+import codecs
+import os
+from common import PrassError
+from collections import OrderedDict
+from itertools import izip
+
+def parse_ass_time(string):
+    hours, minutes, seconds = map(float, string.split(':'))
+    return hours*3600+minutes*60+seconds
+
+
+def format_time(seconds):
+    cs = round(seconds * 100)
+    return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
+            int(cs // 360000),
+            int((cs // 6000) % 60),
+            int((cs // 100) % 60),
+            int(cs % 100))
+
+
+class AssStyle(object):
+    def __init__(self, name, definition):
+        self.name = name
+        self.definition = definition
+
+    @classmethod
+    def from_string(cls, text):
+        split = text.split(':', 1)[1].split(',', 1)
+        return cls(name=split[0].strip(), definition=split[1].strip())
+
+
+class AssEvent(object):
+    def __init__(self, start, end, text, kind='Dialogue', layer=0, style='Default', name='',
+                 margin_left=0, margin_right=0, margin_vertical=0, effect=''):
+        self.kind = kind
+        self.layer = layer
+        self.start = start
+        self.end = end
+        self.style = style
+        self.name = name
+        self.margin_left = margin_left
+        self.margin_right = margin_right
+        self.margin_vertical = margin_vertical
+        self.effect = effect
+        self.text = text
+
+    @classmethod
+    def from_text(cls, text):
+        split = text.split(':', 1)
+        kind = split[0]
+
+        split = [x.strip() for x in split[1].split(',', 9)]
+        return cls(
+            kind=kind,
+            layer=int(split[0]),
+            start=parse_ass_time(split[1]),
+            end=parse_ass_time(split[2]),
+            style=split[3],
+            name=split[4],
+            margin_left=split[5],
+            margin_right=split[6],
+            margin_vertical=split[7],
+            effect=split[8],
+            text=split[9]
+        )
+
+    def __unicode__(self):
+        return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
+                                                                       self._format_time(self.start),
+                                                                       self._format_time(self.end),
+                                                                       self.style, self.name,
+                                                                       self.margin_left, self.margin_right,
+                                                                       self.margin_vertical, self.effect,
+                                                                       self.text)
+
+    @property
+    def is_comment(self):
+        return self.kind.lower() == 'comment'
+
+    @staticmethod
+    def _format_time(seconds):
+        return format_time(seconds)
+
+    def collides_with(self, other):
+        if self.start < other.start:
+            return self.end > other.start
+        return self.start < other.end
+
+
+class AssScript(object):
+    def __init__(self, script_info, styles, events):
+        super(AssScript, self).__init__()
+        self.script_info = script_info
+        self.styles = styles
+        self.events = events
+
+    @classmethod
+    def from_ass_stream(cls, file_object):
+        script_info, styles, events = [], OrderedDict(), []
+
+        parse_script_info_line = lambda x: script_info.append(x)
+
+        def parse_styles_line(text):
+            style = AssStyle.from_string(text)
+            styles[style.name] = style
+
+        parse_event_line = lambda x: events.append(AssEvent.from_text(x))
+
+        parse_function = None
+        for line in file_object:
+            line = line.strip()
+            if not line:
+                continue
+            low = line.lower()
+            if low == u'[script info]':
+                parse_function = parse_script_info_line
+            elif low == u'[v4+ styles]':
+                parse_function = parse_styles_line
+            elif low == u'[events]':
+                parse_function = parse_event_line
+            elif low.startswith(u'format:'):
+                continue  # ignore it
+            elif not parse_function:
+                raise PrassError("That's some invalid ASS script")
+            else:
+                try:
+                    parse_function(line)
+                except Exception as e:
+                    raise PrassError("That's some invalid ASS script: {0}".format(e.message))
+        return cls(script_info, styles, events)
+
+    @classmethod
+    def from_ass_file(cls, path):
+        try:
+            with codecs.open(path, encoding='utf-8-sig') as script:
+                return cls.from_ass_stream(script)
+        except IOError:
+            raise PrassError("Script {0} not found".format(path))
+
+    @classmethod
+    def from_srt_stream(cls, file_object):
+        events = []
+        parse_time = lambda x: parse_ass_time(x.replace(',', '.'))
+
+        for srt_event in file_object.read().replace('\r\n', '\n').split('\n\n'):
+            if not srt_event:
+                continue
+            lines = srt_event.split('\n', 2)
+            times = lines[1].split('-->')
+            events.append(AssEvent(
+                start=parse_time(times[0].rstrip()),
+                end=parse_time(times[1].lstrip()),
+                text=lines[2].replace('\n', r'\N')
+            ))
+        styles = OrderedDict()#
+        styles['Default'] = AssStyle('Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
+        script_info = ['Script converted by Prass']
+        return cls(script_info, styles, events)
+
+    def to_ass_stream(self, file_object):
+        lines = []
+        if self.script_info:
+            lines.append(u'[Script Info]')
+            lines.extend(self.script_info)
+            lines.append('')
+
+        if self.styles:
+            lines.append(u'[V4+ Styles]')
+            lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
+            lines.extend('Style: {0},{1}'.format(style.name, style.definition) for style in self.styles.itervalues())
+            lines.append('')
+
+        if self.events:
+            lines.append(u'[Events]')
+            lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
+            lines.extend(map(unicode, self.events))
+        lines.append('')
+        file_object.write(unicode(os.linesep).join(lines))
+
+    def to_ass_file(self, path):
+        with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
+            self.to_ass_stream(script)
+
+    def append_styles(self, other, clean):
+        if clean:
+            self.styles = OrderedDict()
+        for style in other.itervalues():
+            self.styles[style.name] = style
+
+    def sort_events(self, key, descending):
+        self.events.sort(key=key, reverse=descending)
+
+    def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias):
+        def safe_time(other_events, event, current_time, comparator):
+            for other in other_events:
+                if not event.collides_with(other):
+                    current_time = comparator(current_time, other)
+            return current_time
+
+        events = (e for e in self.events if not e.is_comment)
+        if styles:
+            styles = set(s.lower() for s in styles)
+            events = (e for e in events if e.style.lower() in styles)
+
+        events = sorted(events, key=lambda x: x.start)
+        broken = next((e for e in events if e.start > e.end), None)
+        if broken:
+            raise PrassError("One of the lines in the file ({0}) has negative duration. Aborting.".format(broken))
+
+        # all times are converted to seconds because that's how we roll
+        if lead_in:
+            lead_in /= 1000.0
+            for idx, event in enumerate(events):
+                event.start = safe_time(reversed(events[:idx]), event, event.start - lead_in,
+                                        lambda current_time, other_event: max(current_time, other_event.end))
+
+        if lead_out:
+            lead_out /= 1000.0
+            for idx, event in enumerate(events):
+                event.end = safe_time(events[idx:], event, event.end + lead_out,
+                                      lambda current_time, other_event: min(current_time, other_event.start))
+
+        if max_overlap or max_gap:
+            bias = adjacent_bias/100.0
+            max_gap /= 1000.0
+            max_overlap /= 1000.0
+
+            for previous, current in izip(events, events[1:]):
+                distance = current.start - previous.end
+                if (distance < 0 and -distance <= max_overlap) or (distance > 0 and distance <= max_gap):
+                    new_time = previous.end + distance * bias
+                    current.start = new_time
+                    previous.end = new_time

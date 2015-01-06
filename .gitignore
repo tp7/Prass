@@ -1,0 +1,7 @@
+.idea
+test
+*.pyc
+tests/media
+dist
+build
+tests.json
