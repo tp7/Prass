@@ -4,7 +4,10 @@ from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
 
-@click.group()
+CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
+
+
+@click.group(context_settings=CONTEXT_SETTINGS)
 def cli():
     pass
 
