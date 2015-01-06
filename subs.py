@@ -1,8 +1,10 @@
 import codecs
 import os
+import bisect
+from itertools import izip
 from common import PrassError
 from collections import OrderedDict
-from itertools import izip
+
 
 def parse_ass_time(string):
     hours, minutes, seconds = map(float, string.split(':'))
@@ -190,34 +192,47 @@ class AssScript(object):
     def sort_events(self, key, descending):
         self.events.sort(key=key, reverse=descending)
 
-    def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias):
+    def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
+            keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
         def safe_time(other_events, event, current_time, comparator):
             for other in other_events:
                 if not event.collides_with(other):
                     current_time = comparator(current_time, other)
             return current_time
 
-        events = (e for e in self.events if not e.is_comment)
+        def get_distance_to_closest_kf(timestamp, keytimes):
+            idx = bisect.bisect_left(keytimes, timestamp)
+            if idx == 0:
+                kf = keytimes[0]
+            elif idx == len(keytimes):
+                kf = keytimes[-1]
+            else:
+                before = keytimes[idx - 1]
+                after = keytimes[idx]
+                kf = after if after - timestamp < timestamp - before else before
+            return kf - timestamp
+
+        events_iter = (e for e in self.events if not e.is_comment)
         if styles:
             styles = set(s.lower() for s in styles)
-            events = (e for e in events if e.style.lower() in styles)
+            events_iter = (e for e in events_iter if e.style.lower() in styles)
 
-        events = sorted(events, key=lambda x: x.start)
-        broken = next((e for e in events if e.start > e.end), None)
+        events_list = sorted(events_iter, key=lambda x: x.start)
+        broken = next((e for e in events_list if e.start > e.end), None)
         if broken:
             raise PrassError("One of the lines in the file ({0}) has negative duration. Aborting.".format(broken))
 
         # all times are converted to seconds because that's how we roll
         if lead_in:
             lead_in /= 1000.0
-            for idx, event in enumerate(events):
-                event.start = safe_time(reversed(events[:idx]), event, event.start - lead_in,
+            for idx, event in enumerate(events_list):
+                event.start = safe_time(reversed(events_list[:idx]), event, event.start - lead_in,
                                         lambda current_time, other_event: max(current_time, other_event.end))
 
         if lead_out:
             lead_out /= 1000.0
-            for idx, event in enumerate(events):
-                event.end = safe_time(events[idx:], event, event.end + lead_out,
+            for idx, event in enumerate(events_list):
+                event.end = safe_time(events_list[idx:], event, event.end + lead_out,
                                       lambda current_time, other_event: min(current_time, other_event.start))
 
         if max_overlap or max_gap:
@@ -225,9 +240,25 @@ class AssScript(object):
             max_gap /= 1000.0
             max_overlap /= 1000.0
 
-            for previous, current in izip(events, events[1:]):
+            for previous, current in izip(events_list, events_list[1:]):
                 distance = current.start - previous.end
                 if (distance < 0 and -distance <= max_overlap) or (distance > 0 and distance <= max_gap):
                     new_time = previous.end + distance * bias
                     current.start = new_time
                     previous.end = new_time
+
+        if kf_before_start or kf_after_start or kf_before_end or kf_after_end:
+            kf_before_start /= 1000.0
+            kf_after_start /= 1000.0
+            kf_before_end /= 1000.0
+            kf_after_end /= 1000.0
+
+            keytimes = [timecodes.get_frame_time(x) for x in keyframes_list]
+            for event in events_list:
+                start_distance = get_distance_to_closest_kf(event.start, keytimes)
+                end_distance = get_distance_to_closest_kf(event.end + timecodes.get_frame_size(event.end), keytimes)
+
+                if (start_distance < 0 and -start_distance < kf_before_start) or (start_distance > 0 and start_distance < kf_after_start):
+                    event.start += start_distance
+                if (end_distance < 0 and -end_distance < kf_before_end) or (end_distance > 0 and end_distance < kf_after_end):
+                    event.end += end_distance
