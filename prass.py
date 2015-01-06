@@ -15,9 +15,14 @@ def cli():
 
 @cli.command("convert-srt", short_help="convert srt subtitles to ass")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'))
-@click.argument("input_file", type=click.File(encoding="utf-8-sig"))
-def convert_srt(input_file, output_file):
-    AssScript.from_srt_stream(input_file).to_ass_stream(output_file)
+@click.option("--encoding", "encoding", default='utf-8-sig')
+@click.argument("input_path", type=click.Path(dir_okay=False))
+def convert_srt(input_path, output_file, encoding):
+    try:
+        with click.open_file(input_path, encoding=encoding) as input_file:
+            AssScript.from_srt_stream(input_file).to_ass_stream(output_file)
+    except LookupError:
+        raise PrassError("Encoding {0} doesn't exist".format(encoding))
 
 
 @cli.command('copy-styles', short_help="copy stiles from one ass script to another")
@@ -124,7 +129,7 @@ if __name__ == '__main__':
     try:
         default_map = {}
         if not sys.stdin.isatty():
-            for command, arg_name in (("convert-srt", "input_file"), ("sort", "input_file"), ("tpp", "input_file")):
+            for command, arg_name in (("convert-srt", "input_path"), ("sort", "input_file"), ("tpp", "input_file")):
                 default_map[command] = {arg_name: '-'}
 
         cli(default_map=default_map)
