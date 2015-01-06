@@ -23,9 +23,9 @@ Some parameters are not mentioned - just run `prass --help` or `prass %command% 
 ### Pipes
 Prass more or less supports pipes and allows you to do fun stuff like
 ```bash
-prass convert-srt input.srt | prass sort - --by time | prass tpp - --overlap 150 --gap 150 -o out.ass
+prass convert-srt input.srt | prass sort --by time | prass tpp --overlap 150 --gap 150 -o out.ass
 ```
-If you don't provide output file, most commands will use stdout by default. You do have to provide `-` as input file to use stdin.
+If you don't provide some file arguments, most commands will use stdin/stdout by default. They will also do this if you provide "-" as file paths.
 
 ### Installation
 Prass should work on OS X, Linux and Windows without any problems. Right now the only dependency is [Click](http://click.pocoo.org/3/) which you can install with `pip install click`.
