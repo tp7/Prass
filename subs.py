@@ -1,7 +1,7 @@
 import codecs
 import os
 import bisect
-from itertools import izip, takewhile
+from itertools import izip
 from common import PrassError
 from collections import OrderedDict
 
@@ -233,11 +233,12 @@ class AssScript(object):
         # all times are converted to seconds because that's how we roll
         if lead_in:
             lead_in /= 1000.0
-            for idx, event in enumerate(events_list):
+            sorted_by_end = sorted(events_list, key=lambda x: x.end)
+            for idx, event in enumerate(sorted_by_end):
                 initial = event.start - lead_in
-                for other in reversed(events_list[:idx]):
+                for other in reversed(sorted_by_end[:idx]):
                     if other.end <= initial:
-                        continue
+                        break
                     if not event.collides_with(other):
                         initial = max(initial, other.end)
                 event.start = initial
@@ -246,7 +247,9 @@ class AssScript(object):
             lead_out /= 1000.0
             for idx, event in enumerate(events_list):
                 initial = event.end + lead_out
-                for other in takewhile(lambda e: e.start <= initial, events_list[idx:]):
+                for other in events_list[idx:]:
+                    if other.start > initial:
+                        break
                     if not event.collides_with(other):
                         initial = min(initial, other.start)
                 event.end = initial
