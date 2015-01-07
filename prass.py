@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 import click
 import sys
+from operator import attrgetter
 from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
@@ -44,23 +45,22 @@ def copy_styles(dst_file, src_file, output_file, clean):
 @cli.command('sort', short_help="sort ass script events")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
-@click.option('--by', 'sort_by', default='start', type=click.Choice(['time', 'start', 'end', 'style', 'actor', 'effect', 'layer']),
-              help="Parameter to sort by")
+@click.option('--by', 'sort_by', multiple=True, default='start', help="Parameter to sort by",
+              type=click.Choice(['time', 'start', 'end', 'style', 'actor', 'effect', 'layer']))
 @click.option('--desc', 'descending', default=False, is_flag=True, help="Descending order")
 def sort_script(input_file, output_file, sort_by, descending):
     script = AssScript.from_ass_stream(input_file)
-    if sort_by == 'start' or sort_by == 'time':
-        script.sort_events(lambda x: x.start, descending)
-    elif sort_by == 'end':
-        script.sort_events(lambda x: x.end, descending)
-    elif sort_by == 'style':
-        script.sort_events(lambda x: x.style, descending)
-    elif sort_by == 'actor':
-        script.sort_events(lambda x: x.actor, descending)
-    elif sort_by == 'effect':
-        script.sort_events(lambda x: x.effect, descending)
-    elif sort_by == 'layer':
-        script.sort_events(lambda x: x.layer, descending)
+    attrs_map = {
+        "start": "start",
+        "time": "start",
+        "end": "end",
+        "style": "style",
+        "actor": "actor",
+        "effect": "effect",
+        "layer": "layer"
+    }
+    getter = attrgetter(*[attrs_map[x] for x in sort_by])
+    script.sort_events(getter, descending)
     script.to_ass_stream(output_file)
 
 
