@@ -12,7 +12,7 @@ The main script is called `prass.py` and it provides a few commands for working 
 # to convert subtitles from SRT to ASS
 prass convert-srt input.srt -o output.ass
 # to copy styles from one ASS script to another
-prass copy-styles --from input.ass --to output.ass
+prass copy-styles --from template.ass --to input.ass -o output.ass
 # to sort an ASS script
 prass sort input.ass --by time -o output.ass
 # to run tpp
@@ -23,7 +23,7 @@ Some parameters are not mentioned - just run `prass --help` or `prass %command% 
 ### Pipes
 Prass more or less supports pipes and allows you to do fun stuff like
 ```bash
-prass convert-srt input.srt | prass sort --by time | prass tpp --overlap 150 --gap 150 -o out.ass
+prass convert-srt input.srt | prass copy-styles --from template.ass | prass sort --by time | prass tpp --overlap 150 --gap 150 -o out.ass
 ```
 If you don't provide some file arguments, most commands will use stdin/stdout by default. They will also do this if you provide "-" as file paths.
 
