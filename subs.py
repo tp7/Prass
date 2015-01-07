@@ -106,9 +106,9 @@ class AssEvent(object):
 class AssScript(object):
     def __init__(self, script_info, styles, events):
         super(AssScript, self).__init__()
-        self.script_info = script_info
-        self.styles = styles
-        self.events = events
+        self._script_info = script_info
+        self._styles = styles
+        self._events = events
 
     @classmethod
     def from_ass_stream(cls, file_object):
@@ -175,21 +175,21 @@ class AssScript(object):
 
     def to_ass_stream(self, file_object):
         lines = []
-        if self.script_info:
+        if self._script_info:
             lines.append(u'[Script Info]')
-            lines.extend(self.script_info)
+            lines.extend(self._script_info)
             lines.append('')
 
-        if self.styles:
+        if self._styles:
             lines.append(u'[V4+ Styles]')
             lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
-            lines.extend('Style: {0},{1}'.format(style.name, style.definition) for style in self.styles.itervalues())
+            lines.extend('Style: {0},{1}'.format(style.name, style.definition) for style in self._styles.itervalues())
             lines.append('')
 
-        if self.events:
+        if self._events:
             lines.append(u'[Events]')
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            lines.extend(map(unicode, self.events))
+            lines.extend(map(unicode, self._events))
         lines.append('')
         file_object.write(unicode(os.linesep).join(lines))
 
@@ -199,12 +199,12 @@ class AssScript(object):
 
     def append_styles(self, other, clean):
         if clean:
-            self.styles = OrderedDict()
+            self._styles = OrderedDict()
         for style in other.itervalues():
-            self.styles[style.name] = style
+            self._styles[style.name] = style
 
     def sort_events(self, key, descending):
-        self.events.sort(key=key, reverse=descending)
+        self._events.sort(key=key, reverse=descending)
 
     def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
             keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
@@ -220,7 +220,7 @@ class AssScript(object):
                 kf = after if after - timestamp < timestamp - before else before
             return kf - timestamp
 
-        events_iter = (e for e in self.events if not e.is_comment)
+        events_iter = (e for e in self._events if not e.is_comment)
         if styles:
             styles = set(s.lower() for s in styles)
             events_iter = (e for e in events_iter if e.style.lower() in styles)
