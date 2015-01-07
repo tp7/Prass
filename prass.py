@@ -26,20 +26,19 @@ def convert_srt(input_path, output_file, encoding):
 
 
 @cli.command('copy-styles', short_help="copy stiles from one ass script to another")
-@click.option('--to', 'dst_file', required=True, type=click.File(encoding='utf-8-sig', mode='r+'),
+@click.option("-o", "--output", "output_file", default="-", type=click.File(encoding="utf-8-sig", mode='w'))
+@click.option('--to', 'dst_file', required=True, type=click.File(encoding='utf-8-sig', mode='r'),
               help="File to copy the styles to. Will be rewritten so you might want to backup.")
 @click.option('--from', 'src_file', required=True, type=click.File(encoding='utf-8-sig', mode='r'),
               help="File to take the styles from")
 @click.option('--clean', default=False, is_flag=True,
               help="Remove all older styles in the destination file")
-def copy_styles(dst_file, src_file, clean):
+def copy_styles(dst_file, src_file, output_file, clean):
     src_script = AssScript.from_ass_stream(src_file)
     dst_script = AssScript.from_ass_stream(dst_file)
 
     dst_script.append_styles(src_script.styles, clean=clean)
-    dst_file.seek(0)
-    dst_script.to_ass_stream(dst_file)
-    dst_file.truncate(dst_file.tell())
+    dst_script.to_ass_stream(output_file)
 
 
 @cli.command('sort', short_help="sort ass script events")
@@ -129,7 +128,8 @@ if __name__ == '__main__':
     try:
         default_map = {}
         if not sys.stdin.isatty():
-            for command, arg_name in (("convert-srt", "input_path"), ("sort", "input_file"), ("tpp", "input_file")):
+            for command, arg_name in (("convert-srt", "input_path"), ("copy-styles", "dst_file"),
+                                      ("sort", "input_file"), ("tpp", "input_file")):
                 default_map[command] = {arg_name: '-'}
 
         cli(default_map=default_map)
