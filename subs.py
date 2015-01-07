@@ -38,7 +38,7 @@ class AssEvent(object):
         "start",
         "end",
         "style",
-        "name",
+        "actor",
         "margin_left",
         "margin_right",
         "margin_vertical",
@@ -46,14 +46,14 @@ class AssEvent(object):
         "text"
     )
 
-    def __init__(self, start, end, text, kind='Dialogue', layer=0, style='Default', name='',
+    def __init__(self, start, end, text, kind='Dialogue', layer=0, style='Default', actor='',
                  margin_left=0, margin_right=0, margin_vertical=0, effect=''):
         self.kind = kind
         self.layer = layer
         self.start = start
         self.end = end
         self.style = style
-        self.name = name
+        self.actor = actor
         self.margin_left = margin_left
         self.margin_right = margin_right
         self.margin_vertical = margin_vertical
@@ -72,7 +72,7 @@ class AssEvent(object):
             start=parse_ass_time(split[1]),
             end=parse_ass_time(split[2]),
             style=split[3],
-            name=split[4],
+            actor=split[4],
             margin_left=split[5],
             margin_right=split[6],
             margin_vertical=split[7],
@@ -82,9 +82,9 @@ class AssEvent(object):
 
     def __unicode__(self):
         return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
-                                                                       self._format_time(self.start),
-                                                                       self._format_time(self.end),
-                                                                       self.style, self.name,
+                                                                       format_time(self.start),
+                                                                       format_time(self.end),
+                                                                       self.style, self.actor,
                                                                        self.margin_left, self.margin_right,
                                                                        self.margin_vertical, self.effect,
                                                                        self.text)
@@ -92,10 +92,6 @@ class AssEvent(object):
     @property
     def is_comment(self):
         return self.kind.lower() == 'comment'
-
-    @staticmethod
-    def _format_time(seconds):
-        return format_time(seconds)
 
     def collides_with(self, other):
         if self.start < other.start:
@@ -281,3 +277,24 @@ class AssScript(object):
                     event.start += start_distance
                 if (end_distance < 0 and -end_distance < kf_before_end) or (end_distance > 0 and end_distance < kf_after_end):
                     event.end += end_distance
+
+    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
+        if drop_comments:
+            self._events = [e for e in self._events if not e.is_comment]
+
+        if drop_empty_lines:
+            self._events = [e for e in self._events if e.text]
+
+        if drop_unused_styles:
+            used_styles = set(e.style for e in self._events)
+            for style_name in self._styles.keys():
+                if style_name not in used_styles:
+                    del self._styles[style_name]
+
+        if drop_actors:
+            for event in self._events:
+                event.actor = ''
+
+        if drop_effects:
+            for event in self._events:
+                event.effect = ''

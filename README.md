@@ -17,6 +17,8 @@ prass copy-styles --from template.ass --to input.ass -o output.ass
 prass sort input.ass --by time -o output.ass
 # to run tpp
 prass tpp input.ass -s default,alt --lead-in 100 --lead-out 200 --keyframes kfs.txt --fps 23.976 --kf-before-start 150 --kf-after-start 150
+# to cleanup a script
+prass cleanup --comments --empty-lines --styles input.ass -o output.ass
 ```
 Some parameters are not mentioned - just run `prass --help` or `prass %command% --help` to see the full docs.
 
