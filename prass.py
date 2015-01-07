@@ -127,11 +127,16 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
 @cli.command("cleanup")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
-@click.option("--comments", "drop_comments", default=False, is_flag=True)
-@click.option("--empty-lines", "drop_empty_lines", default=False, is_flag=True)
-@click.option("--styles", "drop_unused_styles", default=False, is_flag=True)
-@click.option("--actors", "drop_actors", default=False, is_flag=True)
-@click.option("--effects", "drop_effects", default=False, is_flag=True)
+@click.option("--comments", "drop_comments", default=False, is_flag=True,
+              help="Remove commented lines")
+@click.option("--empty-lines", "drop_empty_lines", default=False, is_flag=True,
+              help="Remove empty lines")
+@click.option("--styles", "drop_unused_styles", default=False, is_flag=True,
+              help="Remove unused styles")
+@click.option("--actors", "drop_actors", default=False, is_flag=True,
+              help="Remove actor field")
+@click.option("--effects", "drop_effects", default=False, is_flag=True,
+              help="Remove effects field")
 def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
     script = AssScript.from_ass_stream(input_file)
     script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects)
