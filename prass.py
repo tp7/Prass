@@ -125,7 +125,7 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
     script.to_ass_stream(output_file)
 
 
-@cli.command("cleanup")
+@cli.command("cleanup", short_help="remove useless data from ass scripts")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
 @click.option("--comments", "drop_comments", default=False, is_flag=True,
@@ -144,7 +144,7 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
     script.to_ass_stream(output_file)
 
 
-@cli.command("shift")
+@cli.command("shift", short_help="shift start or end times of every event")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
 @click.option("--by", "shift_by", required=True, metavar="<time>",

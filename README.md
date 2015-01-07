@@ -32,4 +32,7 @@ prass convert-srt input.srt | prass copy-styles --from template.ass | prass sort
 If you don't provide some file arguments, most commands will use stdin/stdout by default. They will also do this if you provide "-" as file paths.
 
 ### Installation
-Prass should work on OS X, Linux and Windows without any problems. Right now the only dependency is [Click](http://click.pocoo.org/3/) which you can install with `pip install click`.
+Prass should work on OS X, Linux and Windows without any problems. Right now the only dependency is [Click](http://click.pocoo.org/3/). Assuming you have python and pip, just run:
+```bash
+pip install git+https://github.com/tp7/prass
+```
