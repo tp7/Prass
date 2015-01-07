@@ -45,7 +45,7 @@ def copy_styles(dst_file, src_file, output_file, clean):
 @cli.command('sort', short_help="sort ass script events")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
-@click.option('--by', 'sort_by', multiple=True, default='start', help="Parameter to sort by",
+@click.option('--by', 'sort_by', multiple=True, default=['start'], help="Parameter to sort by",
               type=click.Choice(['time', 'start', 'end', 'style', 'actor', 'effect', 'layer']))
 @click.option('--desc', 'descending', default=False, is_flag=True, help="Descending order")
 def sort_script(input_file, output_file, sort_by, descending):
