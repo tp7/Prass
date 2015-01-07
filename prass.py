@@ -17,9 +17,15 @@ def cli():
 
 @cli.command("convert-srt", short_help="convert srt subtitles to ass")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'))
-@click.option("--encoding", "encoding", default='utf-8-sig')
+@click.option("--encoding", "encoding", default='utf-8-sig', help="Encoding to use for the input SRT file")
 @click.argument("input_path", type=click.Path(dir_okay=False))
 def convert_srt(input_path, output_file, encoding):
+    """Convert SRT script to ASS.
+
+    \b
+    Example:
+    $ prass convert-srt input.srt -o output.ass --encoding cp1251
+    """
     try:
         with click.open_file(input_path, encoding=encoding) as input_file:
             AssScript.from_srt_stream(input_file).to_ass_stream(output_file)
@@ -36,6 +42,15 @@ def convert_srt(input_path, output_file, encoding):
 @click.option('--clean', default=False, is_flag=True,
               help="Remove all older styles in the destination file")
 def copy_styles(dst_file, src_file, output_file, clean):
+    """Copy styles from one ASS script to another, write the result as a third script.
+    You always have to provide the "from" argument, "to" defaults to stdin and "output" defaults to stdout.
+
+    \b
+    Simple usage:
+    $ prass copy-styles --from template.ass --to unstyled.ass -o styled.ass
+    With pipes:
+    $ cat unstyled.ass | prass copy-styles --from template.ass | prass cleanup --comments -o out.ass
+    """
     src_script = AssScript.from_ass_stream(src_file)
     dst_script = AssScript.from_ass_stream(dst_file)
 
@@ -50,6 +65,15 @@ def copy_styles(dst_file, src_file, output_file, clean):
               type=click.Choice(['time', 'start', 'end', 'style', 'actor', 'effect', 'layer']))
 @click.option('--desc', 'descending', default=False, is_flag=True, help="Descending order")
 def sort_script(input_file, output_file, sort_by, descending):
+    """Sort script by one or more parameters.
+
+    \b
+    Sorting by time:
+    $ prass sort input.ass --by time -o output.ass
+    Sorting by time and then by layer, both in descending order:
+    $ prass sort input.ass --by time --by layer --desc -o output.ass
+
+    """
     script = AssScript.from_ass_stream(input_file)
     attrs_map = {
         "start": "start",
@@ -98,6 +122,19 @@ def sort_script(input_file, output_file, sort_by, descending):
               help="Max distance between a keyframe and event end for it to be snapped, when keyframe is placed after the event")
 def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
         keyframes_path, timecodes_path, fps, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
+    """Timing post-processor.
+    It's a pretty straightforward port from Aegisub so you should be familiar with it.
+    You have to specify keyframes and timecodes (either as a CFR value or a timecodes file) if you want keyframe snapping.
+    All parameters default to zero so if you don't want something - just don't put it in the command line.
+
+    \b
+    To add lead-in and lead-out:
+    $ prass tpp input.ass --lead-in 50 --lead-out 150 -o output.ass
+    To make adjacent lines continuous, with 80% bias to changing end time of the first line:
+    $ prass tpp input.ass --overlap 50 --gap 200 --bias 80 -o output.ass
+    To snap events to keyframes without a timecodes file:
+    $ prass tpp input.ass --keyframes kfs.txt --fps 23.976 --kf-before-end 150 --kf-after-end 150 --kf-before-start 150 --kf-after-start 150 -o output.ass
+    """
 
     if fps and timecodes_path:
         raise PrassError('Timecodes file and fps cannot be specified at the same time')
@@ -139,6 +176,12 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
 @click.option("--effects", "drop_effects", default=False, is_flag=True,
               help="Remove effects field")
 def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
+    """Remove junk data from ASS script
+
+    \b
+    To remove commented and empty lines plus clear unused styles:
+    $ prass cleanup input.ass --comments --empty-lines --styles output.ass
+    """
     script = AssScript.from_ass_stream(input_file)
     script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects)
     script.to_ass_stream(output_file)
@@ -152,6 +195,21 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
 @click.option("--start", "shift_start", default=False, is_flag=True, help="Shift only start time")
 @click.option("--end", "shift_end", default=False, is_flag=True, help="Shift only end time")
 def shift(input_file, output_file, shift_by, shift_start, shift_end):
+    """Shift all lines in a script by defined amount.
+
+    \b
+    You can use one of the following formats to specify the time:
+        - "1.5s" or just "1.5" means 1 second 500 milliseconds
+        - "150ms" means 150 milliseconds
+        - "1:7:12.55" means 1 hour, 7 minutes, 12 seconds and 550 milliseconds. All parts are optional.
+    Every format allows a negative sign before the value, which means "shift back", like "-12s"
+
+    \b
+    To shift both start end end time by one minute and 15 seconds:
+    $ prass shift input.ass --by 1:15 -o output.ass
+    To shift only start time by half a second back:
+    $ prass shift input.ass --start --by -0.5s -o output.ass
+    """
     if not shift_start and not shift_end:
         shift_start = shift_end = True
 
