@@ -302,6 +302,6 @@ class AssScript(object):
     def shift(self, shift, shift_start, shift_end):
         for event in self._events:
             if shift_start:
-                event.start += shift
+                event.start = max(event.start + shift, 0)
             if shift_end:
-                event.end += shift
+                event.end = max(event.end + shift, 0)
