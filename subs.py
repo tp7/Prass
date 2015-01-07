@@ -1,7 +1,7 @@
 import codecs
 import os
 import bisect
-from itertools import izip
+from itertools import izip, takewhile
 from common import PrassError
 from collections import OrderedDict
 
@@ -194,12 +194,6 @@ class AssScript(object):
 
     def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
             keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
-        def safe_time(other_events, event, current_time, comparator):
-            for other in other_events:
-                if not event.collides_with(other):
-                    current_time = comparator(current_time, other)
-            return current_time
-
         def get_distance_to_closest_kf(timestamp, keytimes):
             idx = bisect.bisect_left(keytimes, timestamp)
             if idx == 0:
@@ -226,14 +220,22 @@ class AssScript(object):
         if lead_in:
             lead_in /= 1000.0
             for idx, event in enumerate(events_list):
-                event.start = safe_time(reversed(events_list[:idx]), event, event.start - lead_in,
-                                        lambda current_time, other_event: max(current_time, other_event.end))
+                initial = event.start - lead_in
+                for other in reversed(events_list[:idx]):
+                    if other.end <= initial:
+                        continue
+                    if not event.collides_with(other):
+                        initial = max(initial, other.end)
+                event.start = initial
 
         if lead_out:
             lead_out /= 1000.0
             for idx, event in enumerate(events_list):
-                event.end = safe_time(events_list[idx:], event, event.end + lead_out,
-                                      lambda current_time, other_event: min(current_time, other_event.start))
+                initial = event.end + lead_out
+                for other in takewhile(lambda e: e.start <= initial, events_list[idx:]):
+                    if not event.collides_with(other):
+                        initial = min(initial, other.start)
+                event.end = initial
 
         if max_overlap or max_gap:
             bias = adjacent_bias/100.0
