@@ -32,6 +32,20 @@ class AssStyle(object):
 
 
 class AssEvent(object):
+    __slots__ = (
+        "kind",
+        "layer",
+        "start",
+        "end",
+        "style",
+        "name",
+        "margin_left",
+        "margin_right",
+        "margin_vertical",
+        "effect",
+        "text"
+    )
+
     def __init__(self, start, end, text, kind='Dialogue', layer=0, style='Default', name='',
                  margin_left=0, margin_right=0, margin_vertical=0, effect=''):
         self.kind = kind
