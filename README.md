@@ -19,6 +19,8 @@ prass sort input.ass --by time -o output.ass
 prass tpp input.ass -s default,alt --lead-in 100 --lead-out 200 --keyframes kfs.txt --fps 23.976 --kf-before-start 150 --kf-after-start 150
 # to cleanup a script
 prass cleanup --comments --empty-lines --styles input.ass -o output.ass
+# to shift start time back by 1 minute and 10 seconds
+prass shift --start --by -1:10 input.ass -o output.ass
 ```
 Some parameters are not mentioned - just run `prass --help` or `prass %command% --help` to see the full docs.
 

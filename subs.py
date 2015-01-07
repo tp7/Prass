@@ -298,3 +298,10 @@ class AssScript(object):
         if drop_effects:
             for event in self._events:
                 event.effect = ''
+
+    def shift(self, shift, shift_start, shift_end):
+        for event in self._events:
+            if shift_start:
+                event.start += shift
+            if shift_end:
+                event.end += shift

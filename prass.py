@@ -2,6 +2,7 @@
 import click
 import sys
 from operator import attrgetter
+from itertools import izip
 from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
@@ -142,12 +143,50 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
     script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects)
     script.to_ass_stream(output_file)
 
+
+@cli.command("shift")
+@click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
+@click.argument("input_file", type=click.File(encoding="utf-8-sig"))
+@click.option("--by", "shift_by", required=True, metavar="<time>",
+              help="Time to shift. Might be negative. 10.5s, 150ms or 1:12.23 formats are allowed, seconds assumed by default")
+@click.option("--start", "shift_start", default=False, is_flag=True, help="Shift only start time")
+@click.option("--end", "shift_end", default=False, is_flag=True, help="Shift only end time")
+def shift(input_file, output_file, shift_by, shift_start, shift_end):
+    if not shift_start and not shift_end:
+        shift_start = shift_end = True
+
+    try:
+        if ':' in shift_by:
+            negator = 1
+            if shift_by.startswith('-'):
+                negator = -1
+                shift_by = shift_by[1:]
+            parts = map(float, shift_by.split(':'))
+            shift = 0
+            for part, multiplier in izip(reversed(parts), (1.0, 60.0, 3600.0)):
+                shift += part * multiplier * negator
+        else:
+            if shift_by.endswith("ms"):
+                shift = float(shift_by[:-2]) / 1000.0
+            elif shift_by.endswith("s"):
+                shift = float(shift_by[:-1])
+            else:
+                shift = float(shift_by)
+    except ValueError:
+        raise PrassError("Invalid shift value")
+
+    script = AssScript.from_ass_stream(input_file)
+    script.shift(shift, shift_start, shift_end)
+    script.to_ass_stream(output_file)
+
+
 if __name__ == '__main__':
     try:
         default_map = {}
         if not sys.stdin.isatty():
             for command, arg_name in (("convert-srt", "input_path"), ("copy-styles", "dst_file"),
-                                      ("sort", "input_file"), ("tpp", "input_file")):
+                                      ("sort", "input_file"), ("tpp", "input_file"), ("cleanup", "input_file"),
+                                      ('shift', "input_file")):
                 default_map[command] = {arg_name: '-'}
 
         cli(default_map=default_map)
