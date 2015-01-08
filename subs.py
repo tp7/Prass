@@ -1,6 +1,7 @@
 import codecs
 import os
 import bisect
+import re
 from itertools import izip
 from common import PrassError
 from collections import OrderedDict
@@ -286,7 +287,15 @@ class AssScript(object):
             self._events = [e for e in self._events if e.text]
 
         if drop_unused_styles:
-            used_styles = set(e.style for e in self._events)
+            used_styles = set()
+
+            for event in self._events:
+                used_styles.add(event.style)
+                if '\\r' in event.text:  # fast dirty check because these lines are very rare
+                    for override_block in re.findall(r"{([^{}]*\\r[^{}]*)}", event.text):
+                        for style in re.findall(r"\\r([^}\\]+)", override_block):
+                            used_styles.add(style)
+
             for style_name in self._styles.keys():
                 if style_name not in used_styles:
                     del self._styles[style_name]
