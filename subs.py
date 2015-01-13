@@ -2,7 +2,7 @@ import codecs
 import os
 import bisect
 import re
-from itertools import izip
+from compat import zip, itervalues, py2_unicode_compatible
 from common import PrassError
 from collections import OrderedDict
 
@@ -28,10 +28,11 @@ class AssStyle(object):
 
     @classmethod
     def from_string(cls, text):
-        split = text.split(':', 1)[1].split(',', 1)
+        split = text.split(u':', 1)[1].split(',', 1)
         return cls(name=split[0].strip(), definition=split[1].strip())
 
 
+@py2_unicode_compatible
 class AssEvent(object):
     __slots__ = (
         "kind",
@@ -63,7 +64,7 @@ class AssEvent(object):
 
     @classmethod
     def from_text(cls, text):
-        split = text.split(':', 1)
+        split = text.split(u':', 1)
         kind = split[0]
 
         split = [x.strip() for x in split[1].split(',', 9)]
@@ -81,7 +82,7 @@ class AssEvent(object):
             text=split[9]
         )
 
-    def __unicode__(self):
+    def __str__(self):
         return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
                                                                        format_time(self.start),
                                                                        format_time(self.end),
@@ -92,7 +93,7 @@ class AssEvent(object):
 
     @property
     def is_comment(self):
-        return self.kind.lower() == 'comment'
+        return self.kind.lower() == u'comment'
 
     def collides_with(self, other):
         if self.start < other.start:
@@ -134,12 +135,12 @@ class AssScript(object):
             elif low.startswith(u'format:'):
                 continue  # ignore it
             elif not parse_function:
-                raise PrassError("That's some invalid ASS script")
+                raise PrassError(u"That's some invalid ASS script")
             else:
                 try:
                     parse_function(line)
                 except Exception as e:
-                    raise PrassError("That's some invalid ASS script: {0}".format(e.message))
+                    raise PrassError(u"That's some invalid ASS script: {0}".format(e.message))
         return cls(script_info, styles, events)
 
     @classmethod
@@ -166,8 +167,8 @@ class AssScript(object):
                 text=lines[2].replace('\n', r'\N')
             ))
         styles = OrderedDict()#
-        styles['Default'] = AssStyle('Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
-        script_info = ['Script converted by Prass']
+        styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
+        script_info = [u'Script converted by Prass']
         return cls(script_info, styles, events)
 
     def to_ass_stream(self, file_object):
@@ -175,20 +176,20 @@ class AssScript(object):
         if self._script_info:
             lines.append(u'[Script Info]')
             lines.extend(self._script_info)
-            lines.append('')
+            lines.append(u'')
 
         if self._styles:
             lines.append(u'[V4+ Styles]')
             lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
-            lines.extend('Style: {0},{1}'.format(style.name, style.definition) for style in self._styles.itervalues())
-            lines.append('')
+            lines.extend(u'Style: {0},{1}'.format(style.name, style.definition) for style in itervalues(self._styles))
+            lines.append(u'')
 
         if self._events:
             lines.append(u'[Events]')
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            lines.extend(map(unicode, self._events))
-        lines.append('')
-        file_object.write(unicode(os.linesep).join(lines))
+            lines.extend(u"%s" % x for x in self._events)
+        lines.append(u'')
+        file_object.write(os.linesep.join(lines))
 
     def to_ass_file(self, path):
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
@@ -197,7 +198,7 @@ class AssScript(object):
     def append_styles(self, other, clean):
         if clean:
             self._styles = OrderedDict()
-        for style in other.itervalues():
+        for style in itervalues(other):
             self._styles[style.name] = style
 
     def sort_events(self, key, descending):
@@ -256,7 +257,7 @@ class AssScript(object):
             max_gap /= 1000.0
             max_overlap /= 1000.0
 
-            for previous, current in izip(events_list, events_list[1:]):
+            for previous, current in zip(events_list, events_list[1:]):
                 distance = current.start - previous.end
                 if (distance < 0 and -distance <= max_overlap) or (distance > 0 and distance <= max_gap):
                     new_time = previous.end + distance * bias

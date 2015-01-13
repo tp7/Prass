@@ -2,7 +2,7 @@
 import click
 import sys
 from operator import attrgetter
-from itertools import izip
+from compat import zip
 from common import PrassError
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
@@ -221,7 +221,7 @@ def shift(input_file, output_file, shift_by, shift_start, shift_end):
                 shift_by = shift_by[1:]
             parts = map(float, shift_by.split(':'))
             shift = 0
-            for part, multiplier in izip(reversed(parts), (1.0, 60.0, 3600.0)):
+            for part, multiplier in zip(reversed(parts), (1.0, 60.0, 3600.0)):
                 shift += part * multiplier * negator
         else:
             if shift_by.endswith("ms"):
