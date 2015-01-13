@@ -110,7 +110,7 @@ def sort_script(input_file, output_file, sort_by, descending):
               help="Path to keyframes file")
 @click.option("--timecodes", "timecodes_path", type=click.Path(readable=True, dir_okay=False), metavar="<path>",
               help="Path to timecodes file")
-@click.option("--fps", "fps", type=float, metavar="<float>",
+@click.option("--fps", "fps", metavar="<float>",
               help="Fps provided as float value, in case you don't have timecodes")
 @click.option("--kf-before-start", default=0, type=float, metavar="<ms>",
               help="Max distance between a keyframe and event start for it to be snapped, when keyframe is placed before the event")
@@ -139,6 +139,19 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
     if fps and timecodes_path:
         raise PrassError('Timecodes file and fps cannot be specified at the same time')
     if fps:
+        if '/' in fps:
+            parts = fps.split('/')
+            if len(parts) > 2:
+                raise PrassError('Invalid fps value')
+            try:
+                fps = float(parts[0]) / float(parts[1])
+            except ValueError:
+                raise PrassError('Invalid fps value')
+        else:
+            try:
+                fps = float(fps)
+            except ValueError:
+                raise PrassError('Invalid fps value')
         timecodes = Timecodes.cfr(fps)
     elif timecodes_path:
         timecodes = Timecodes.from_file(timecodes_path)
