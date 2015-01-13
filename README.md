@@ -1,7 +1,7 @@
 ## Prass
 Console processor for ASS subtitles.
 
-This script is super pre-alpha so things might break, although they shouldn't. Feature requests and any kind of feedback are welcome.
+Feature requests and any kind of feedback are welcome.
 
 ### Why?
 Imagine you've got a few dozens of subtitle files and you want to apply TPP to each of them, and maybe also restyle one of the files and use the same group of styles for everything else. This script allows you to easily do it from console so you don't have to suffer with Aegisub.
@@ -32,7 +32,7 @@ prass convert-srt input.srt | prass copy-styles --from template.ass | prass sort
 If you don't provide some file arguments, most commands will use stdin/stdout by default. They will also do this if you provide "-" as file paths.
 
 ### Installation
-Prass should work on OS X, Linux and Windows without any problems. Right now the only dependency is [Click](http://click.pocoo.org/3/). Assuming you have python and pip, just run:
+Prass should work on OS X, Linux and Windows without any problems, both on Python 2.7.x and Python 3.x (but py2 is preferable). Right now the only dependency is [Click](http://click.pocoo.org/3/). Assuming you have python and pip, just run:
 ```bash
 pip install git+https://github.com/tp7/prass
 ```
