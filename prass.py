@@ -54,7 +54,7 @@ def copy_styles(dst_file, src_file, output_file, clean):
     src_script = AssScript.from_ass_stream(src_file)
     dst_script = AssScript.from_ass_stream(dst_file)
 
-    dst_script.append_styles(src_script.styles, clean=clean)
+    dst_script.append_styles(src_script, clean=clean)
     dst_script.to_ass_stream(output_file)
 
 

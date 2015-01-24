@@ -195,10 +195,10 @@ class AssScript(object):
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
             self.to_ass_stream(script)
 
-    def append_styles(self, other, clean):
+    def append_styles(self, other_script, clean):
         if clean:
             self._styles = OrderedDict()
-        for style in itervalues(other):
+        for style in itervalues(other_script._styles):
             self._styles[style.name] = style
 
     def sort_events(self, key, descending):
