@@ -102,46 +102,85 @@ class AssEvent(object):
 
 
 class AssScript(object):
-    def __init__(self, script_info, styles, events):
+    STYLES_NAME = u"[V4+ Styles]"
+    EVENTS_NAME = u"[Events]"
+    SCRIPT_INFO_NAME = u"[Script Info]"
+
+    class StylesSection(object):
+        def __init__(self):
+            self.name = AssScript.STYLES_NAME
+            self.styles = OrderedDict()
+
+        def parse_line(self, text):
+            if text.startswith(u'Format:'):
+                return
+            style = AssStyle.from_string(text)
+            self.styles[style.name] = style
+
+        def format_section(self):
+            lines = [self.name, u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding']
+            lines.extend(u'Style: {0},{1}'.format(style.name, style.definition) for style in itervalues(self.styles))
+            return lines
+
+        def clear(self):
+            self.styles = OrderedDict()
+
+    class EventsSection(object):
+        def __init__(self):
+            self.name = AssScript.EVENTS_NAME
+            self.events = []
+
+        def parse_line(self, text):
+            if text.startswith(u'Format:'):
+                return
+            self.events.append(AssEvent.from_text(text))
+
+        def format_section(self):
+            lines = [self.name, u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
+            lines.extend(u"%s" % x for x in self.events)
+            return lines
+
+    class GenericSection(object):
+        def __init__(self, section_name):
+            self.name = section_name
+            self.lines = []
+
+        def parse_line(self, line):
+            self.lines.append(line)
+
+        def format_section(self):
+            return [self.name] + self.lines
+
+
+    def __init__(self, sections_dict):
         super(AssScript, self).__init__()
-        self._script_info = script_info
-        self._styles = styles
-        self._events = events
+        self._sections_dict = sections_dict
+        self._events_section = sections_dict[self.EVENTS_NAME]
+        self._styles_section = sections_dict[self.STYLES_NAME]
 
     @classmethod
     def from_ass_stream(cls, file_object):
-        script_info, styles, events = [], OrderedDict(), []
-
-        parse_script_info_line = lambda x: script_info.append(x)
-
-        def parse_styles_line(text):
-            style = AssStyle.from_string(text)
-            styles[style.name] = style
-
-        parse_event_line = lambda x: events.append(AssEvent.from_text(x))
-
-        parse_function = None
-        for line in file_object:
+        sections = OrderedDict()
+        current_section = None
+        for idx, line in enumerate(file_object):
             line = line.strip()
             if not line:
                 continue
             low = line.lower()
-            if low == u'[script info]':
-                parse_function = parse_script_info_line
-            elif low == u'[v4+ styles]':
-                parse_function = parse_styles_line
+            if low == u'[v4+ styles]':
+                sections[cls.STYLES_NAME] = current_section = cls.StylesSection()
             elif low == u'[events]':
-                parse_function = parse_event_line
-            elif low.startswith(u'format:'):
-                continue  # ignore it
-            elif not parse_function:
-                raise PrassError(u"That's some invalid ASS script")
+                sections[cls.EVENTS_NAME] = current_section = cls.EventsSection()
+            elif re.match(r'\[.+?\]', low):
+                sections[line] = current_section = cls.GenericSection(line)
+            elif not current_section:
+                raise PrassError(u"That's some invalid ASS script (no parse function at line {0})".format(idx))
             else:
                 try:
-                    parse_function(line)
+                    current_section.parse_line(line)
                 except Exception as e:
                     raise PrassError(u"That's some invalid ASS script: {0}".format(e.message))
-        return cls(script_info, styles, events)
+        return cls(sections)
 
     @classmethod
     def from_ass_file(cls, path):
@@ -153,7 +192,8 @@ class AssScript(object):
 
     @classmethod
     def from_srt_stream(cls, file_object):
-        events = []
+        styles_section = cls.StylesSection()
+        events_section = cls.EventsSection()
         parse_time = lambda x: parse_ass_time(x.replace(',', '.'))
 
         for srt_event in file_object.read().replace('\r\n', '\n').split('\n\n'):
@@ -161,34 +201,25 @@ class AssScript(object):
                 continue
             lines = srt_event.split('\n', 2)
             times = lines[1].split('-->')
-            events.append(AssEvent(
+            events_section.events.append(AssEvent(
                 start=parse_time(times[0].rstrip()),
                 end=parse_time(times[1].lstrip()),
                 text=lines[2].replace('\n', r'\N')
             ))
-        styles = OrderedDict()#
-        styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
-        script_info = [u'Script converted by Prass']
-        return cls(script_info, styles, events)
+        styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
+        sections = OrderedDict()
+        sections[cls.SCRIPT_INFO_NAME] = cls.GenericSection(cls.SCRIPT_INFO_NAME)
+        sections[cls.SCRIPT_INFO_NAME].lines.append(u'; Script converted by Prass')
+        sections[styles_section.name] = styles_section
+        sections[events_section] = events_section
+        return cls(sections)
 
     def to_ass_stream(self, file_object):
         lines = []
-        if self._script_info:
-            lines.append(u'[Script Info]')
-            lines.extend(self._script_info)
-            lines.append(u'')
+        for section in itervalues(self._sections_dict):
+            lines.extend(section.format_section())
+            lines.append(u"")
 
-        if self._styles:
-            lines.append(u'[V4+ Styles]')
-            lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
-            lines.extend(u'Style: {0},{1}'.format(style.name, style.definition) for style in itervalues(self._styles))
-            lines.append(u'')
-
-        if self._events:
-            lines.append(u'[Events]')
-            lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            lines.extend(u"%s" % x for x in self._events)
-        lines.append(u'')
         file_object.write(os.linesep.join(lines))
 
     def to_ass_file(self, path):
@@ -197,12 +228,12 @@ class AssScript(object):
 
     def append_styles(self, other_script, clean):
         if clean:
-            self._styles = OrderedDict()
-        for style in itervalues(other_script._styles):
-            self._styles[style.name] = style
+            self._styles_section.clear()
+        for style in itervalues(other_script._styles_section.styles):
+            self._styles_section.styles[style.name] = style
 
     def sort_events(self, key, descending):
-        self._events.sort(key=key, reverse=descending)
+        self._events_section.events.sort(key=key, reverse=descending)
 
     def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
             keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
@@ -218,7 +249,7 @@ class AssScript(object):
                 kf = after if after - timestamp < timestamp - before else before
             return kf - timestamp
 
-        events_iter = (e for e in self._events if not e.is_comment)
+        events_iter = (e for e in self._events_section.events if not e.is_comment)
         if styles:
             styles = set(s.lower() for s in styles)
             events_iter = (e for e in events_iter if e.style.lower() in styles)
@@ -282,35 +313,35 @@ class AssScript(object):
 
     def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
         if drop_comments:
-            self._events = [e for e in self._events if not e.is_comment]
+            self._events_section.events = [e for e in self._events_section.events if not e.is_comment]
 
         if drop_empty_lines:
-            self._events = [e for e in self._events if e.text]
+            self._events_section.events = [e for e in self._events_section.events if e.text]
 
         if drop_unused_styles:
             used_styles = set()
 
-            for event in self._events:
+            for event in self._events_section.events:
                 used_styles.add(event.style)
                 if '\\r' in event.text:  # fast dirty check because these lines are very rare
                     for override_block in re.findall(r"{([^{}]*\\r[^{}]*)}", event.text):
                         for style in re.findall(r"\\r([^}\\]+)", override_block):
                             used_styles.add(style)
 
-            for style_name in self._styles.keys():
+            for style_name in self._styles_section.styles.keys():
                 if style_name not in used_styles:
-                    del self._styles[style_name]
+                    del self._styles_section.styles[style_name]
 
         if drop_actors:
-            for event in self._events:
+            for event in self._events_section.events:
                 event.actor = ''
 
         if drop_effects:
-            for event in self._events:
+            for event in self._events_section.events:
                 event.effect = ''
 
     def shift(self, shift, shift_start, shift_end):
-        for event in self._events:
+        for event in self._events_section.events:
             if shift_start:
                 event.start = max(event.start + shift, 0)
             if shift_end:
