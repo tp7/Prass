@@ -272,8 +272,8 @@ class AssScript(object):
 
             keytimes = [timecodes.get_frame_time(x) for x in keyframes_list]
             for event in events_list:
-                start_distance = get_distance_to_closest_kf(event.start, keytimes)
-                end_distance = get_distance_to_closest_kf(event.end + timecodes.get_frame_size(event.end), keytimes)
+                start_distance = get_distance_to_closest_kf(event.start + timecodes.get_frame_size(event.start) / 2, keytimes)
+                end_distance = get_distance_to_closest_kf(event.end + timecodes.get_frame_size(event.end) / 2, keytimes)
 
                 if (start_distance < 0 and -start_distance < kf_before_start) or (start_distance > 0 and start_distance < kf_after_start):
                     event.start += start_distance
