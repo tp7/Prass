@@ -8,12 +8,12 @@ from collections import OrderedDict
 
 
 def parse_ass_time(string):
-    hours, minutes, seconds = map(float, string.split(':'))
-    return hours*3600+minutes*60+seconds
+    hours, minutes, seconds, centiseconds = map(int, re.match(r"(\d+):(\d+):(\d+)\.(\d+)", string).groups())
+    return hours * 3600000 + minutes * 60000 + seconds * 1000 + centiseconds * 10
 
 
-def format_time(seconds):
-    cs = round(seconds * 100)
+def format_time(ms):
+    cs = int(ms / 10.0)
     return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
             int(cs // 360000),
             int((cs // 6000) % 60),
@@ -151,7 +151,6 @@ class AssScript(object):
         def format_section(self):
             return [self.name] + self.lines
 
-
     def __init__(self, sections_dict):
         super(AssScript, self).__init__()
         self._sections_dict = sections_dict
@@ -237,17 +236,15 @@ class AssScript(object):
 
     def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
             keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
-        def get_distance_to_closest_kf(timestamp, keytimes):
-            idx = bisect.bisect_left(keytimes, timestamp)
-            if idx == 0:
-                kf = keytimes[0]
-            elif idx == len(keytimes):
-                kf = keytimes[-1]
-            else:
-                before = keytimes[idx - 1]
-                after = keytimes[idx]
-                kf = after if after - timestamp < timestamp - before else before
-            return kf - timestamp
+
+        def get_closest_kf(frame, keyframes):
+            idx = bisect.bisect_left(keyframes, frame)
+            if idx == len(keyframes):
+                return keyframes[-1]
+            if idx == 0 or keyframes[idx] - frame < frame - (keyframes[idx-1]):
+                return keyframes[idx]
+            return keyframes[idx-1]
+
 
         events_iter = (e for e in self._events_section.events if not e.is_comment)
         if styles:
@@ -261,7 +258,6 @@ class AssScript(object):
 
         # all times are converted to seconds because that's how we roll
         if lead_in:
-            lead_in /= 1000.0
             sorted_by_end = sorted(events_list, key=lambda x: x.end)
             for idx, event in enumerate(sorted_by_end):
                 initial = event.start - lead_in
@@ -273,7 +269,6 @@ class AssScript(object):
                 event.start = initial
 
         if lead_out:
-            lead_out /= 1000.0
             for idx, event in enumerate(events_list):
                 initial = event.end + lead_out
                 for other in events_list[idx:]:
@@ -285,8 +280,6 @@ class AssScript(object):
 
         if max_overlap or max_gap:
             bias = adjacent_bias/100.0
-            max_gap /= 1000.0
-            max_overlap /= 1000.0
 
             for previous, current in zip(events_list, events_list[1:]):
                 distance = current.start - previous.end
@@ -296,20 +289,22 @@ class AssScript(object):
                     previous.end = new_time
 
         if kf_before_start or kf_after_start or kf_before_end or kf_after_end:
-            kf_before_start /= 1000.0
-            kf_after_start /= 1000.0
-            kf_before_end /= 1000.0
-            kf_after_end /= 1000.0
-
-            keytimes = [timecodes.get_frame_time(x) for x in keyframes_list]
             for event in events_list:
-                start_distance = get_distance_to_closest_kf(event.start + timecodes.get_frame_size(event.start) / 2, keytimes)
-                end_distance = get_distance_to_closest_kf(event.end + timecodes.get_frame_size(event.end) / 2, keytimes)
+                start_frame = timecodes.get_frame_number(event.start, timecodes.TIMESTAMP_START)
+                end_frame = timecodes.get_frame_number(event.end, timecodes.TIMESTAMP_END)
 
-                if (start_distance < 0 and -start_distance < kf_before_start) or (start_distance > 0 and start_distance < kf_after_start):
-                    event.start += start_distance
-                if (end_distance < 0 and -end_distance < kf_before_end) or (end_distance > 0 and end_distance < kf_after_end):
-                    event.end += end_distance
+                closest_frame = get_closest_kf(start_frame, keyframes_list)
+                closest_time = timecodes.get_frame_time(closest_frame, timecodes.TIMESTAMP_START)
+
+                if (closest_frame > start_frame and closest_time - event.start <= kf_before_start) or \
+                        (closest_frame < start_frame and event.start - closest_time <= kf_after_start):
+                    event.start = closest_time
+
+                closest_frame = get_closest_kf(end_frame, keyframes_list) - 1
+                closest_time = timecodes.get_frame_time(closest_frame, timecodes.TIMESTAMP_END)
+                if (closest_frame > end_frame and closest_time - event.end <= kf_before_end) or \
+                        (closest_frame < end_frame and event.end - closest_time <= kf_after_end):
+                    event.end = closest_time
 
     def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
         if drop_comments:

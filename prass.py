@@ -236,13 +236,14 @@ def shift(input_file, output_file, shift_by, shift_start, shift_end):
             shift = 0
             for part, multiplier in zip(reversed(parts), (1.0, 60.0, 3600.0)):
                 shift += part * multiplier * negator
+            shift *= 1000  # convert to ms
         else:
             if shift_by.endswith("ms"):
-                shift = float(shift_by[:-2]) / 1000.0
+                shift = float(shift_by[:-2])
             elif shift_by.endswith("s"):
-                shift = float(shift_by[:-1])
+                shift = float(shift_by[:-1]) * 1000
             else:
-                shift = float(shift_by)
+                shift = float(shift_by) * 1000
     except ValueError:
         raise PrassError("Invalid shift value")
 
