@@ -2,8 +2,7 @@
 import click
 import sys
 from operator import attrgetter
-from compat import zip
-from common import PrassError
+from common import PrassError, zip
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
 

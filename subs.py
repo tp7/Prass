@@ -2,8 +2,7 @@ import codecs
 import os
 import bisect
 import re
-from compat import zip, itervalues, py2_unicode_compatible
-from common import PrassError
+from common import PrassError, zip, itervalues, py2_unicode_compatible
 from collections import OrderedDict
 
 
@@ -245,7 +244,6 @@ class AssScript(object):
                 return keyframes[idx]
             return keyframes[idx-1]
 
-
         events_iter = (e for e in self._events_section.events if not e.is_comment)
         if styles:
             styles = set(s.lower() for s in styles)
@@ -256,7 +254,6 @@ class AssScript(object):
         if broken:
             raise PrassError("One of the lines in the file ({0}) has negative duration. Aborting.".format(broken))
 
-        # all times are converted to seconds because that's how we roll
         if lead_in:
             sorted_by_end = sorted(events_list, key=lambda x: x.end)
             for idx, event in enumerate(sorted_by_end):
