@@ -303,7 +303,7 @@ class AssScript(object):
                         (closest_frame < end_frame and event.end - closest_time <= kf_after_end):
                     event.end = closest_time
 
-    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
+    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing):
         if drop_comments:
             self._events_section.events = [e for e in self._events_section.events if not e.is_comment]
 
@@ -331,6 +331,10 @@ class AssScript(object):
         if drop_effects:
             for event in self._events_section.events:
                 event.effect = ''
+
+        if drop_spacing:
+            for event in self._events_section.events:
+                event.text = re.sub("\s+", " ", event.text.replace("\N", " ").replace("\n", " "))
 
     def shift(self, shift, shift_start, shift_end):
         for event in self._events_section.events:

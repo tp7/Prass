@@ -187,7 +187,9 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
               help="Remove actor field")
 @click.option("--effects", "drop_effects", default=False, is_flag=True,
               help="Remove effects field")
-def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects):
+@click.option("--spacing", "drop_spacing", default=False, is_flag=True,
+              help="Removes double spacing and newlines")
+def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing):
     """Remove junk data from ASS script
 
     \b
@@ -195,7 +197,7 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
     $ prass cleanup input.ass --comments --empty-lines --styles output.ass
     """
     script = AssScript.from_ass_stream(input_file)
-    script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects)
+    script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing)
     script.to_ass_stream(output_file)
 
 
