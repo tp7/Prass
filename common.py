@@ -9,9 +9,11 @@ if not PY2:
     py2_unicode_compatible = lambda x: x
 
     itervalues = lambda x: iter(x.values())
+    iterkeys = lambda x: iter(x.keys())
     zip = zip
 else:
     itervalues = lambda x: x.itervalues()
+    iterkeys = lambda x: x.iterkeys()
     import itertools
     zip = itertools.izip
 

@@ -1,4 +1,4 @@
-## Prass
+## Prass [![Build Status](https://travis-ci.org/tp7/Prass.svg)](https://travis-ci.org/tp7/Prass)
 Console processor for ASS subtitles.
 
 Feature requests and any kind of feedback are welcome.

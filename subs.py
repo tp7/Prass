@@ -2,7 +2,7 @@ import codecs
 import os
 import bisect
 import re
-from common import PrassError, zip, itervalues, py2_unicode_compatible
+from common import PrassError, zip, itervalues, iterkeys, py2_unicode_compatible
 from collections import OrderedDict
 
 
@@ -320,7 +320,7 @@ class AssScript(object):
                         for style in re.findall(r"\\r([^}\\]+)", override_block):
                             used_styles.add(style)
 
-            for style_name in self._styles_section.styles.keys():
+            for style_name in list(iterkeys(self._styles_section.styles)):
                 if style_name not in used_styles:
                     del self._styles_section.styles[style_name]
 
@@ -334,7 +334,7 @@ class AssScript(object):
 
         if drop_spacing:
             for event in self._events_section.events:
-                event.text = re.sub("\s+", " ", event.text.replace("\N", " ").replace("\n", " "))
+                event.text = re.sub("\s+", " ", event.text.replace(r"\N", " ").replace(r"\n", " "))
 
     def shift(self, shift, shift_start, shift_end):
         for event in self._events_section.events:

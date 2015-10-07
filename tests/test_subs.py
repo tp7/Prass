@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import unittest
 import os
-import StringIO
 import codecs
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 import subs
 
@@ -13,7 +16,7 @@ def get_script_path(name):
 
 
 def script_to_string(ass_script):
-    buffer = StringIO.StringIO()
+    buffer = StringIO()
     ass_script.to_ass_stream(buffer)
     return buffer.getvalue()
 
