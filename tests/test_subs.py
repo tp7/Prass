@@ -47,3 +47,51 @@ class TestStyles(unittest.TestCase):
         source.resample(from_width=848, from_height=480, to_width=1920, to_height=1080)
         self.assertEqual(source.definition, u"Arial,81,&H00FFFFFF,&H000000FF,&H00020713,&H00000000,-1,0,0,0,100,100,0,0,1,3.825,0,2,0,0,63,1")
 
+
+class TestScriptInfoSection(unittest.TestCase):
+    def test_comments(self):
+        section = subs.ScriptInfoSection()
+        section.parse_line("; random comment")
+        section.parse_line("; another comment")
+        self.assertEqual(["; random comment", "; another comment"], section.format_section())
+
+    def test_order(self):
+        section = subs.ScriptInfoSection()
+        section.parse_line("; random")
+        section.parse_line("Property: 2")
+        section.parse_line("; comment")
+        section.parse_line("Another: property")
+        self.assertEqual(["; random", "Property: 2", "; comment", "Another: property"],
+                         section.format_section())
+
+    def test_resolution(self):
+        section = subs.ScriptInfoSection()
+        self.assertEqual((None, None), section.get_resolution())
+
+        section.parse_line("PlayResY: 480")
+        section.parse_line("PlayResX: 848")
+        self.assertEqual((848, 480), section.get_resolution())
+
+        section.set_resolution(1920, 1080)
+        self.assertEqual(["PlayResY: 1080", "PlayResX: 1920"], section.format_section())
+        self.assertEqual((1920, 1080), section.get_resolution())
+
+    def test_setting_property(self):
+        section = subs.ScriptInfoSection()
+        section.set_property("Random", 12.5)
+        section.set_property("teSt", "property")
+        self.assertEqual(["Random: 12.5", "teSt: property"], section.format_section())
+
+        section.set_property("Random", "other value")
+        self.assertEqual(["Random: other value", "teSt: property"], section.format_section())
+
+    def test_getting_property(self):
+        section = subs.ScriptInfoSection()
+        section.parse_line("Random: property")
+
+        self.assertEqual("property", section.get_property("Random"))
+
+        self.assertRaises(KeyError, lambda: section.get_property("property"))
+        self.assertRaises(KeyError, lambda: section.get_property("rAnDom"))
+
+
