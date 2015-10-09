@@ -2,7 +2,7 @@
 import click
 import sys
 from operator import attrgetter
-from common import PrassError, zip
+from common import PrassError, zip, map
 from subs import AssScript
 from tools import Timecodes, parse_keyframes
 
@@ -32,7 +32,7 @@ def parse_shift_string(shift_string):
             if shift_string.startswith('-'):
                 negator = -1
                 shift_string = shift_string[1:]
-            parts = map(float, shift_string.split(':'))
+            parts = list(map(float, shift_string.split(':')))
             if len(parts) > 3:
                 raise PrassError("Invalid shift value: '{0}'".format(shift_string))
             shift_seconds = sum(part * multiplier for part, multiplier in zip(reversed(parts), (1.0, 60.0, 3600.0)))
