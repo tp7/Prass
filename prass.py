@@ -9,6 +9,58 @@ from tools import Timecodes, parse_keyframes
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 
+def parse_fps_string(fps_string):
+    if '/' in fps_string:
+        parts = fps_string.split('/')
+        if len(parts) > 2:
+            raise PrassError('Invalid fps value')
+        try:
+            return float(parts[0]) / float(parts[1])
+        except ValueError:
+            raise PrassError('Invalid fps value')
+    else:
+        try:
+            return float(fps_string)
+        except ValueError:
+            raise PrassError('Invalid fps value')
+
+
+def parse_shift_string(shift_string):
+    try:
+        if ':' in shift_string:
+            negator = 1
+            if shift_string.startswith('-'):
+                negator = -1
+                shift_string = shift_string[1:]
+            parts = map(float, shift_string.split(':'))
+            shift_seconds = sum(part * multiplier for part, multiplier in zip(reversed(parts), (1.0, 60.0, 3600.0)))
+            return shift_seconds * 1000 * negator  # convert to ms
+        else:
+            if shift_string.endswith("ms"):
+                return float(shift_string[:-2])
+            elif shift_string.endswith("s"):
+                return float(shift_string[:-1]) * 1000
+            else:
+                return float(shift_string) * 1000
+    except ValueError:
+        raise PrassError("Invalid shift value: '{0}'".format(shift_string))
+
+
+def parse_resolution_string(resolution_string):
+    if resolution_string == '720p':
+        return 1280,720
+    if resolution_string == '1080p':
+        return 1920,1080
+    for separator in (':', 'x'):
+        if separator in resolution_string:
+            width, _, height = resolution_string.partition(separator)
+            try:
+                return int(width), int(height)
+            except ValueError:
+                raise PrassError("Invalid resolution string: '{0}'".format(resolution_string))
+    raise PrassError("Invalid resolution string: '{0}'".format(resolution_string))
+
+
 @click.group(context_settings=CONTEXT_SETTINGS)
 def cli():
     pass
@@ -35,12 +87,15 @@ def convert_srt(input_path, output_file, encoding):
 @cli.command('copy-styles', short_help="copy stiles from one ass script to another")
 @click.option("-o", "--output", "output_file", default="-", type=click.File(encoding="utf-8-sig", mode='w'))
 @click.option('--to', 'dst_file', required=True, type=click.File(encoding='utf-8-sig', mode='r'),
-              help="File to copy the styles to. Will be rewritten so you might want to backup.")
+              help="File to copy the styles to")
 @click.option('--from', 'src_file', required=True, type=click.File(encoding='utf-8-sig', mode='r'),
               help="File to take the styles from")
 @click.option('--clean', default=False, is_flag=True,
               help="Remove all older styles in the destination file")
-def copy_styles(dst_file, src_file, output_file, clean):
+@click.option('--resample/--no-resample', 'resample', default=True,
+              help="Resample style resolution to match output script when possible")
+@click.option('--resolution', 'forced_resolution', default=None, help="Assume resolution of the destination file")
+def copy_styles(dst_file, src_file, output_file, clean, resample, forced_resolution):
     """Copy styles from one ASS script to another, write the result as a third script.
     You always have to provide the "from" argument, "to" defaults to stdin and "output" defaults to stdout.
 
@@ -52,8 +107,10 @@ def copy_styles(dst_file, src_file, output_file, clean):
     """
     src_script = AssScript.from_ass_stream(src_file)
     dst_script = AssScript.from_ass_stream(dst_file)
+    if forced_resolution:
+        forced_resolution = parse_resolution_string(forced_resolution)
 
-    dst_script.append_styles(src_script, clean=clean)
+    dst_script.append_styles(src_script, clean, resample, forced_resolution)
     dst_script.to_ass_stream(output_file)
 
 
@@ -138,20 +195,7 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
     if fps and timecodes_path:
         raise PrassError('Timecodes file and fps cannot be specified at the same time')
     if fps:
-        if '/' in fps:
-            parts = fps.split('/')
-            if len(parts) > 2:
-                raise PrassError('Invalid fps value')
-            try:
-                fps = float(parts[0]) / float(parts[1])
-            except ValueError:
-                raise PrassError('Invalid fps value')
-        else:
-            try:
-                fps = float(fps)
-            except ValueError:
-                raise PrassError('Invalid fps value')
-        timecodes = Timecodes.cfr(fps)
+        timecodes = Timecodes.cfr(parse_fps_string(fps))
     elif timecodes_path:
         timecodes = Timecodes.from_file(timecodes_path)
     elif any((kf_before_start, kf_after_start, kf_before_end, kf_after_end)):
@@ -227,29 +271,9 @@ def shift(input_file, output_file, shift_by, shift_start, shift_end):
     if not shift_start and not shift_end:
         shift_start = shift_end = True
 
-    try:
-        if ':' in shift_by:
-            negator = 1
-            if shift_by.startswith('-'):
-                negator = -1
-                shift_by = shift_by[1:]
-            parts = map(float, shift_by.split(':'))
-            shift = 0
-            for part, multiplier in zip(reversed(parts), (1.0, 60.0, 3600.0)):
-                shift += part * multiplier * negator
-            shift *= 1000  # convert to ms
-        else:
-            if shift_by.endswith("ms"):
-                shift = float(shift_by[:-2])
-            elif shift_by.endswith("s"):
-                shift = float(shift_by[:-1]) * 1000
-            else:
-                shift = float(shift_by) * 1000
-    except ValueError:
-        raise PrassError("Invalid shift value")
-
+    shift_ms = parse_shift_string(shift_by)
     script = AssScript.from_ass_stream(input_file)
-    script.shift(shift, shift_start, shift_end)
+    script.shift(shift_ms, shift_start, shift_end)
     script.to_ass_stream(output_file)
 
 

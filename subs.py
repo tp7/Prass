@@ -2,8 +2,16 @@ import codecs
 import os
 import bisect
 import re
-from common import PrassError, zip, itervalues, iterkeys, py2_unicode_compatible
+import copy
+import logging
 from collections import OrderedDict
+
+from common import PrassError, zip, map, itervalues, iterkeys, iteritems, py2_unicode_compatible
+
+
+STYLES_SECTION = u"[V4+ Styles]"
+EVENTS_SECTION = u"[Events]"
+SCRIPT_INFO_SECTION = u"[Script Info]"
 
 
 def parse_ass_time(string):
@@ -27,8 +35,29 @@ class AssStyle(object):
 
     @classmethod
     def from_string(cls, text):
-        split = text.split(u':', 1)[1].split(',', 1)
-        return cls(name=split[0].strip(), definition=split[1].strip())
+        name, definition = text.split(',', 1)
+        return cls(name=name.strip(), definition=definition.strip())
+
+    def resample(self, from_width, from_height, to_width, to_height):
+        scale_height = to_height / float(from_height)
+        scale_width = to_width / float(from_width)
+        old_ar = from_width / float(from_height)
+        new_ar = to_width / float(to_height)
+        horizontal_stretch = 1.0
+        if abs(old_ar - new_ar) / new_ar > 0.01:
+            horizontal_stretch = new_ar / old_ar
+
+        parts = self.definition.split(",")
+        parts[1] = "%i" % (round(int(parts[1]) * scale_height))  # font size
+        parts[10] = "%g" % (float(parts[10]) * horizontal_stretch)  # scale x
+        parts[12] = "%g" % (float(parts[12]) * scale_width)  # spacing
+        parts[15] = "%g" % (float(parts[15]) * scale_height)  # outline
+        parts[16] = "%g" % (float(parts[16]) * scale_height)  # shadow
+        parts[18] = "%i" % (round(float(parts[18]) * scale_width))  # margin l
+        parts[19] = "%i" % (round(float(parts[19]) * scale_width))  # margin r
+        parts[20] = "%i" % (round(float(parts[20]) * scale_width))  # margin v
+
+        self.definition = u",".join(parts)
 
 
 @py2_unicode_compatible
@@ -63,10 +92,8 @@ class AssEvent(object):
 
     @classmethod
     def from_text(cls, text):
-        split = text.split(u':', 1)
-        kind = split[0]
-
-        split = [x.strip() for x in split[1].split(',', 9)]
+        kind, _, rest = text.partition(u":")
+        split = [x.strip() for x in rest.split(',', 9)]
         return cls(
             kind=kind,
             layer=int(split[0]),
@@ -100,61 +127,117 @@ class AssEvent(object):
         return self.start < other.end
 
 
+class StylesSection(object):
+    def __init__(self):
+        self.styles = OrderedDict()
+
+    def parse_line(self, text):
+        if text.startswith(u'Format:'):
+            return
+        style = AssStyle.from_string(text.partition(u":")[2])
+        self.styles[style.name] = style
+
+    def format_section(self):
+        lines = [u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding']
+        lines.extend(u'Style: {0},{1}'.format(style.name, style.definition) for style in itervalues(self.styles))
+        return lines
+
+
+class EventsSection(object):
+    def __init__(self):
+        self.events = []
+
+    def parse_line(self, text):
+        if text.startswith(u'Format:'):
+            return
+        self.events.append(AssEvent.from_text(text))
+
+    def format_section(self):
+        lines = [u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
+        lines.extend(u"%s" % x for x in self.events)
+        return lines
+
+
+class ScriptInfoSection(object):
+    class PropertyLine(object):
+        def __init__(self, name, value):
+            self.name = name
+            self.value = value
+
+        @classmethod
+        def from_string(cls, string_value):
+            if string_value.startswith(';'):
+                return cls(string_value, None)
+            else:
+                name, _, value = string_value.partition(':')
+                return cls(name, value.strip())
+
+        def to_string(self):
+            if self.value is None:
+                return self.name
+            return "{0}: {1}".format(self.name, self.value)
+
+    def __init__(self):
+        self._lines_dict = OrderedDict()
+
+    def parse_line(self, text):
+        prop = self.PropertyLine.from_string(text)
+        self._lines_dict[prop.name] = prop
+
+    def format_section(self):
+        return [x.to_string() for x in itervalues(self._lines_dict)]
+
+    def get_property(self, name):
+        if name not in self._lines_dict:
+            raise KeyError("Property {0} not found".format(name))
+        return self._lines_dict[name].value
+
+    def set_property(self, name, value):
+        if name not in self._lines_dict:
+            self._lines_dict[name] = self.PropertyLine(name, str(value))
+        else:
+            self._lines_dict[name].value = str(value)
+
+    def get_resolution(self):
+        try:
+            width = int(self.get_property("PlayResX"))
+            height = int(self.get_property("PlayResY"))
+            return width, height
+        except KeyError:
+            return None, None
+
+    def set_resolution(self, width, height):
+        self.set_property("PlayResX", width)
+        self.set_property("PlayResY", height)
+
+
+class GenericSection(object):
+    def __init__(self):
+        self.lines = []
+
+    def parse_line(self, line):
+        self.lines.append(line)
+
+    def format_section(self):
+        return self.lines
+
+
 class AssScript(object):
-    STYLES_NAME = u"[V4+ Styles]"
-    EVENTS_NAME = u"[Events]"
-    SCRIPT_INFO_NAME = u"[Script Info]"
-
-    class StylesSection(object):
-        def __init__(self):
-            self.name = AssScript.STYLES_NAME
-            self.styles = OrderedDict()
-
-        def parse_line(self, text):
-            if text.startswith(u'Format:'):
-                return
-            style = AssStyle.from_string(text)
-            self.styles[style.name] = style
-
-        def format_section(self):
-            lines = [self.name, u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding']
-            lines.extend(u'Style: {0},{1}'.format(style.name, style.definition) for style in itervalues(self.styles))
-            return lines
-
-        def clear(self):
-            self.styles = OrderedDict()
-
-    class EventsSection(object):
-        def __init__(self):
-            self.name = AssScript.EVENTS_NAME
-            self.events = []
-
-        def parse_line(self, text):
-            if text.startswith(u'Format:'):
-                return
-            self.events.append(AssEvent.from_text(text))
-
-        def format_section(self):
-            lines = [self.name, u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text']
-            lines.extend(u"%s" % x for x in self.events)
-            return lines
-
-    class GenericSection(object):
-        def __init__(self, section_name):
-            self.name = section_name
-            self.lines = []
-
-        def parse_line(self, line):
-            self.lines.append(line)
-
-        def format_section(self):
-            return [self.name] + self.lines
-
     def __init__(self, sections_dict):
         super(AssScript, self).__init__()
         self._sections_dict = sections_dict
-        self._events_section = sections_dict[self.EVENTS_NAME]
-        self._styles_section = sections_dict[self.STYLES_NAME]
+
+    @property
+    def _events(self):
+        return self._sections_dict[EVENTS_SECTION].events
+
+    @_events.setter
+    def _events(self, value):
+        self._sections_dict[EVENTS_SECTION].events = value
+
+    @property
+    def _styles(self):
+        return self._sections_dict[STYLES_SECTION].styles
 
     @classmethod
     def from_ass_stream(cls, file_object):
@@ -166,11 +249,13 @@ class AssScript(object):
                 continue
             low = line.lower()
             if low == u'[v4+ styles]':
-                sections[cls.STYLES_NAME] = current_section = cls.StylesSection()
+                sections[STYLES_SECTION] = current_section = StylesSection()
             elif low == u'[events]':
-                sections[cls.EVENTS_NAME] = current_section = cls.EventsSection()
+                sections[EVENTS_SECTION] = current_section = EventsSection()
+            elif low == u'[script info]':
+                sections[SCRIPT_INFO_SECTION] = current_section = ScriptInfoSection()
             elif re.match(r'\[.+?\]', low):
-                sections[line] = current_section = cls.GenericSection(line)
+                sections[line] = current_section = GenericSection()
             elif not current_section:
                 raise PrassError(u"That's some invalid ASS script (no parse function at line {0})".format(idx))
             else:
@@ -190,8 +275,8 @@ class AssScript(object):
 
     @classmethod
     def from_srt_stream(cls, file_object):
-        styles_section = cls.StylesSection()
-        events_section = cls.EventsSection()
+        styles_section = StylesSection()
+        events_section = EventsSection()
         parse_time = lambda x: parse_ass_time(x.replace(',', '.'))
 
         for srt_event in file_object.read().replace('\r\n', '\n').split('\n\n'):
@@ -206,15 +291,16 @@ class AssScript(object):
             ))
         styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
         sections = OrderedDict()
-        sections[cls.SCRIPT_INFO_NAME] = cls.GenericSection(cls.SCRIPT_INFO_NAME)
-        sections[cls.SCRIPT_INFO_NAME].lines.append(u'; Script converted by Prass')
-        sections[styles_section.name] = styles_section
-        sections[events_section] = events_section
+        sections[SCRIPT_INFO_SECTION] = ScriptInfoSection()
+        sections[SCRIPT_INFO_SECTION].parse_line(u'; Script converted by Prass')
+        sections[STYLES_SECTION] = styles_section
+        sections[EVENTS_SECTION] = events_section
         return cls(sections)
 
     def to_ass_stream(self, file_object):
         lines = []
-        for section in itervalues(self._sections_dict):
+        for name, section in iteritems(self._sections_dict):
+            lines.append(name)
             lines.extend(section.format_section())
             lines.append(u"")
 
@@ -224,14 +310,28 @@ class AssScript(object):
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
             self.to_ass_stream(script)
 
-    def append_styles(self, other_script, clean):
+    def append_styles(self, other_script, clean, resample, forced_resolution=None):
         if clean:
-            self._styles_section.clear()
-        for style in itervalues(other_script._styles_section.styles):
-            self._styles_section.styles[style.name] = style
+            self._styles.clear()
+        for style in itervalues(other_script._styles):
+            self._styles[style.name] = copy.deepcopy(style)
+
+        if not resample:
+            return
+        src_width, src_height = self._sections_dict[SCRIPT_INFO_SECTION].get_resolution()
+        if forced_resolution:
+            dst_width, dst_height = forced_resolution
+        else:
+            dst_width, dst_height = other_script._sections_dict[SCRIPT_INFO_SECTION].get_resolution()
+        if all((src_width, src_height, dst_width, dst_height)):
+            for style in itervalues(self._styles):
+                style.resample(src_width, src_height, dst_width, dst_height)
+            self._sections_dict[SCRIPT_INFO_SECTION].set_resolution(dst_width, dst_height)
+        else:
+            logging.info("Couldn't determine resolution, resampling disabled")
 
     def sort_events(self, key, descending):
-        self._events_section.events.sort(key=key, reverse=descending)
+        self._events.sort(key=key, reverse=descending)
 
     def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
             keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
@@ -244,7 +344,7 @@ class AssScript(object):
                 return keyframes[idx]
             return keyframes[idx-1]
 
-        events_iter = (e for e in self._events_section.events if not e.is_comment)
+        events_iter = (e for e in self._events if not e.is_comment)
         if styles:
             styles = set(s.lower() for s in styles)
             events_iter = (e for e in events_iter if e.style.lower() in styles)
@@ -276,7 +376,7 @@ class AssScript(object):
                 event.end = initial
 
         if max_overlap or max_gap:
-            bias = adjacent_bias/100.0
+            bias = adjacent_bias / 100.0
 
             for previous, current in zip(events_list, events_list[1:]):
                 distance = current.start - previous.end
@@ -305,39 +405,38 @@ class AssScript(object):
 
     def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing):
         if drop_comments:
-            self._events_section.events = [e for e in self._events_section.events if not e.is_comment]
+            self._events = [e for e in self._events if not e.is_comment]
 
         if drop_empty_lines:
-            self._events_section.events = [e for e in self._events_section.events if e.text]
+            self._events = [e for e in self._events if e.text]
 
         if drop_unused_styles:
             used_styles = set()
 
-            for event in self._events_section.events:
+            for event in self._events:
                 used_styles.add(event.style)
-                if '\\r' in event.text:  # fast dirty check because these lines are very rare
-                    for override_block in re.findall(r"{([^{}]*\\r[^{}]*)}", event.text):
-                        for style in re.findall(r"\\r([^}\\]+)", override_block):
-                            used_styles.add(style)
+                for override_block in re.findall(r"{([^{}]*\\r[^{}]*)}", event.text):
+                    for style in re.findall(r"\\r([^}\\]+)", override_block):
+                        used_styles.add(style)
 
-            for style_name in list(iterkeys(self._styles_section.styles)):
+            for style_name in list(iterkeys(self._styles)):
                 if style_name not in used_styles:
-                    del self._styles_section.styles[style_name]
+                    del self._styles[style_name]
 
         if drop_actors:
-            for event in self._events_section.events:
+            for event in self._events:
                 event.actor = ''
 
         if drop_effects:
-            for event in self._events_section.events:
+            for event in self._events:
                 event.effect = ''
 
         if drop_spacing:
-            for event in self._events_section.events:
-                event.text = re.sub("\s+", " ", event.text.replace(r"\N", " ").replace(r"\n", " "))
+            for event in self._events:
+                event.text = re.sub(r"(\s|\\N|\\n)+", " ", event.text)
 
     def shift(self, shift, shift_start, shift_end):
-        for event in self._events_section.events:
+        for event in self._events:
             if shift_start:
                 event.start = max(event.start + shift, 0)
             if shift_end:
