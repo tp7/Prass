@@ -361,7 +361,7 @@ class AssScript(object):
         if lead_in:
             sorted_by_end = sorted(events_list, key=lambda x: x.end)
             for idx, event in enumerate(sorted_by_end):
-                initial = event.start - lead_in
+                initial = max(event.start - lead_in, 0)
                 for other in reversed(sorted_by_end[:idx]):
                     if other.end <= initial:
                         break
