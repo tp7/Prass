@@ -19,6 +19,11 @@ def parse_ass_time(string):
     return hours * 3600000 + minutes * 60000 + seconds * 1000 + centiseconds * 10
 
 
+def parse_srt_time(string):
+    hours, minutes, seconds, milliseconds = map(int, re.match(r"(\d+):(\d+):(\d+)\,(\d+)", string).groups())
+    return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
+
+
 def format_time(ms):
     cs = int(ms / 10.0)
     return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
@@ -277,7 +282,6 @@ class AssScript(object):
     def from_srt_stream(cls, file_object):
         styles_section = StylesSection()
         events_section = EventsSection()
-        parse_time = lambda x: parse_ass_time(x.replace(',', '.'))
 
         for srt_event in file_object.read().replace('\r\n', '\n').split('\n\n'):
             if not srt_event:
@@ -285,8 +289,8 @@ class AssScript(object):
             lines = srt_event.split('\n', 2)
             times = lines[1].split('-->')
             events_section.events.append(AssEvent(
-                start=parse_time(times[0].rstrip()),
-                end=parse_time(times[1].lstrip()),
+                start=parse_srt_time(times[0].rstrip()),
+                end=parse_srt_time(times[1].lstrip()),
                 text=lines[2].replace('\n', r'\N')
             ))
         styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')

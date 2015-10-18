@@ -29,6 +29,14 @@ def load_script(name):
 class TestSubs(unittest.TestCase):
     maxDiff = None
 
+    def test_ass_time_parsing(self):
+        self.assertEqual(150, subs.parse_ass_time("00:00:00.15"))
+        self.assertEqual(12150, subs.parse_ass_time("00:00:12.15"))
+        self.assertEqual(132150, subs.parse_ass_time("00:02:12.15"))
+
+    def test_srt_time_parsing(self):
+        self.assertEqual(132150, subs.parse_srt_time("00:02:12,150"))
+
     def test_cleanup(self):
         ass_script = subs.AssScript.from_ass_file(get_script_path("test_script.ass"))
         ass_script.cleanup(drop_actors=True, drop_comments=True, drop_effects=True,
