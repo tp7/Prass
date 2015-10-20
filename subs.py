@@ -308,7 +308,7 @@ class AssScript(object):
             lines.extend(section.format_section())
             lines.append(u"")
 
-        file_object.write(os.linesep.join(lines))
+        file_object.write("\n".join(lines))
 
     def to_ass_file(self, path):
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
