@@ -38,9 +38,10 @@ class TestSubs(unittest.TestCase):
         self.assertEqual(132150, subs.parse_srt_time("00:02:12,150"))
 
     def test_cleanup(self):
+        # this test also ensures that we leave two [Graphics] sections in their proper positions
         ass_script = subs.AssScript.from_ass_file(get_script_path("test_script.ass"))
         ass_script.cleanup(drop_actors=True, drop_comments=True, drop_effects=True,
-                           drop_empty_lines=True, drop_unused_styles=True, drop_spacing=True)
+                           drop_empty_lines=True, drop_unused_styles=True, drop_spacing=True, drop_sections=["[Fonts]"])
 
         self.assertEqual(load_script("cleanup_script.ass"), script_to_string(ass_script))
 

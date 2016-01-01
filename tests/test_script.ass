@@ -19,6 +19,16 @@ Style: Internal,Open Sans Semibold,36,&H00FFFFFF,&H000000FF,&H00020713,&H0000000
 Style: Flashback,Open Sans Semibold,36,&H00FFFFFF,&H000000FF,&H004D0701,&H00000000,0,0,0,0,100,100,0,0,1,2,1,2,13,13,20,0
 Style: Ep Title,Open Sans Semibold,38,&H0000FFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,2,1,8,40,40,20,0
 
+[Graphics]
+filename: invalid.jpeg
+`^D`Y!!13E:*2A!"!1!"8A&?!!$`Y1-W28BJ:A!!45U!+A!!!!A!#A%/!!)!!!!A!!!!BA%0!!)!!!!&
+!!!!JA%1!!)!!!!'!!!!L!%3!!-!!!!"!!%!
+
+[Fonts]
+filename: invalid.tff
+`^D`Y!!13E:*2A!"!1!"8A&?!!$`Y1-W28BJ:A!!45U!+A!!!!A!#A%/!!)!!!!A!!!!BA%0!!)!!!!&
+!!!!JA%1!!)!!!!'!!!!L!%3!!-!!!!"!!%!
+
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.91,0:00:03.44,Main,Tae,0,0,0,,Sorry for making you  \N\N   come along, Shin-chan.
@@ -32,3 +42,8 @@ Dialogue: 0,0:00:11.65,0:00:13.02,Main,Shin,0,0,0,,Oh...
 Dialogue: 0,0:00:13.02,0:00:15.91,Main,Shin,0,0,0,,Meanwhile, all I wear now \Nis this {\b1\rInternal}twin-striped kimono.
 Dialogue: 0,0:00:16.42,0:00:17.92,Main,Shin,0,0,0,,I don't leave much of an impression,
 Dialogue: 0,0:00:17.92,0:00:20.82,Main,Shin,0,0,0,,so I figure I'll be easier  to remember\Nif I always wear the same thing.
+
+[Graphics]
+filename: invalid.jpeg
+`^D`Y!!13E:*2A!"!1!"8A&?!!$`Y1-W28BJ:A!!45U!+A!!!!A!#A%/!!)!!!!A!!!!BA%0!!)!!!!&
+!!!!JA%1!!)!!!!'!!!!L!%3!!-!!!!"!!%!

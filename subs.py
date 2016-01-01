@@ -227,45 +227,76 @@ class GenericSection(object):
         return self.lines
 
 
+class AttachmentSection(GenericSection):
+    def parse_line(self, line):
+        if not line:
+            return False
+        self.lines.append(line)
+
+        # as usual, copied from aegisub
+        is_valid = 0 < len(line) <= 80 #and all(33 <= ord(x) < 97 for x in line)
+        is_filename = line.startswith("fontname: ") or line.startswith("filename: ")
+        return is_valid or is_filename
+
+
 class AssScript(object):
-    def __init__(self, sections_dict):
+    def __init__(self, sections_list):
         super(AssScript, self).__init__()
-        self._sections_dict = sections_dict
+        self._sections_list = sections_list
 
     @property
     def _events(self):
-        return self._sections_dict[EVENTS_SECTION].events
+        return self._find_section(EVENTS_SECTION).events
 
     @_events.setter
     def _events(self, value):
-        self._sections_dict[EVENTS_SECTION].events = value
+        self._find_section(EVENTS_SECTION).events = value
 
     @property
     def _styles(self):
-        return self._sections_dict[STYLES_SECTION].styles
+        return self._find_section(STYLES_SECTION).styles
+
+    def _find_section(self, name):
+        return next((section for section_name, section in self._sections_list if section_name == name), None)
 
     @classmethod
     def from_ass_stream(cls, file_object):
-        sections = OrderedDict()
+        sections = []
         current_section = None
+        force_last_section = False
         for idx, line in enumerate(file_object):
             line = line.strip()
+            # required because a line might be both a part of an attachment and a valid header
+            if force_last_section:
+                try:
+                    force_last_section = current_section.parse_line(line)
+                    continue
+                except Exception as e:
+                    raise PrassError(u"That's some invalid ASS script: {0}".format(e.message))
+
             if not line:
                 continue
             low = line.lower()
             if low == u'[v4+ styles]':
-                sections[STYLES_SECTION] = current_section = StylesSection()
+                current_section = StylesSection()
+                sections.append((line, current_section))
             elif low == u'[events]':
-                sections[EVENTS_SECTION] = current_section = EventsSection()
+                current_section = EventsSection()
+                sections.append((line, current_section))
             elif low == u'[script info]':
-                sections[SCRIPT_INFO_SECTION] = current_section = ScriptInfoSection()
-            elif re.match(r'\[.+?\]', low):
-                sections[line] = current_section = GenericSection()
+                current_section = ScriptInfoSection()
+                sections.append((line, current_section))
+            elif low == u'[graphics]' or low == u'[fonts]':
+                current_section = AttachmentSection()
+                sections.append((line, current_section))
+            elif re.match(r'^\s*\[.+?\]\s*$', low):
+                current_section = GenericSection()
+                sections.append((line, current_section))
             elif not current_section:
                 raise PrassError(u"That's some invalid ASS script (no parse function at line {0})".format(idx))
             else:
                 try:
-                    current_section.parse_line(line)
+                    force_last_section = current_section.parse_line(line)
                 except Exception as e:
                     raise PrassError(u"That's some invalid ASS script: {0}".format(e.message))
         return cls(sections)
@@ -294,16 +325,17 @@ class AssScript(object):
                 text=lines[2].replace('\n', r'\N')
             ))
         styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
-        sections = OrderedDict()
-        sections[SCRIPT_INFO_SECTION] = ScriptInfoSection()
-        sections[SCRIPT_INFO_SECTION].parse_line(u'; Script converted by Prass')
-        sections[STYLES_SECTION] = styles_section
-        sections[EVENTS_SECTION] = events_section
-        return cls(sections)
+        script_info = ScriptInfoSection()
+        script_info.parse_line(u'; Script converted by Prass')
+        return cls([
+            (SCRIPT_INFO_SECTION, script_info),
+            (STYLES_SECTION, styles_section),
+            (EVENTS_SECTION, events_section),
+        ])
 
     def to_ass_stream(self, file_object):
         lines = []
-        for name, section in iteritems(self._sections_dict):
+        for name, section in self._sections_list:
             lines.append(name)
             lines.extend(section.format_section())
             lines.append(u"")
@@ -322,7 +354,7 @@ class AssScript(object):
 
         if not resample:
             return
-        src_width, src_height = self._sections_dict[SCRIPT_INFO_SECTION].get_resolution()
+        src_width, src_height = self._find_section(SCRIPT_INFO_SECTION).get_resolution()
         if forced_resolution:
             dst_width, dst_height = forced_resolution
         else:
@@ -330,7 +362,7 @@ class AssScript(object):
         if all((src_width, src_height, dst_width, dst_height)):
             for style in itervalues(self._styles):
                 style.resample(src_width, src_height, dst_width, dst_height)
-            self._sections_dict[SCRIPT_INFO_SECTION].set_resolution(dst_width, dst_height)
+            self._find_section(SCRIPT_INFO_SECTION).set_resolution(dst_width, dst_height)
         else:
             logging.info("Couldn't determine resolution, resampling disabled")
 
@@ -407,7 +439,7 @@ class AssScript(object):
                         (closest_frame < end_frame and event.end - closest_time <= kf_after_end):
                     event.end = closest_time
 
-    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing):
+    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing, drop_sections):
         if drop_comments:
             self._events = [e for e in self._events if not e.is_comment]
 
@@ -438,6 +470,9 @@ class AssScript(object):
         if drop_spacing:
             for event in self._events:
                 event.text = re.sub(r"(\s|\\N|\\n)+", " ", event.text)
+
+        if drop_sections:
+            self._sections_list = [x for x in self._sections_list if x[0] not in set(drop_sections)]
 
     def shift(self, shift, shift_start, shift_end):
         for event in self._events:

@@ -235,15 +235,26 @@ def tpp(input_file, output_file, styles, lead_in, lead_out, max_overlap, max_gap
               help="Remove effects field")
 @click.option("--spacing", "drop_spacing", default=False, is_flag=True,
               help="Removes double spacing and newlines")
-def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing):
+@click.option("--sections", "drop_sections", type=click.Choice(["fonts", "graphics", "aegi", "extradata"]), multiple=True,
+              help="Remove optional sections from the script")
+def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unused_styles,
+            drop_actors, drop_effects, drop_spacing, drop_sections):
     """Remove junk data from ASS script
 
     \b
     To remove commented and empty lines plus clear unused styles:
     $ prass cleanup input.ass --comments --empty-lines --styles output.ass
     """
+    sections_map = {
+        "fonts": "[Fonts]",
+        "graphics": "[Graphics]",
+        "aegi": "[Aegisub Project Garbage]",
+        "extradata": ["Aegisub Extradata"]
+    }
+    drop_sections = [sections_map[x] for x in drop_sections]
+
     script = AssScript.from_ass_stream(input_file)
-    script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing)
+    script.cleanup(drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing, drop_sections)
     script.to_ass_stream(output_file)
 
 

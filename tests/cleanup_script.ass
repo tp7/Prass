@@ -16,6 +16,11 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Style: Main,Open Sans Semibold,36,&H00FFFFFF,&H000000FF,&H00020713,&H00000000,-1,0,0,0,100,100,0,0,1,1.7,0,2,0,0,28,0
 Style: Internal,Open Sans Semibold,36,&H00FFFFFF,&H000000FF,&H00020713,&H00000000,-1,-1,0,0,100,100,0,0,1,1.7,0,2,0,0,28,0
 
+[Graphics]
+filename: invalid.jpeg
+`^D`Y!!13E:*2A!"!1!"8A&?!!$`Y1-W28BJ:A!!45U!+A!!!!A!#A%/!!)!!!!A!!!!BA%0!!)!!!!&
+!!!!JA%1!!)!!!!'!!!!L!%3!!-!!!!"!!%!
+
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 Dialogue: 0,0:00:00.91,0:00:03.44,Main,,0,0,0,,Sorry for making you come along, Shin-chan.
@@ -27,3 +32,8 @@ Dialogue: 0,0:00:11.65,0:00:13.02,Main,,0,0,0,,Oh...
 Dialogue: 0,0:00:13.02,0:00:15.91,Main,,0,0,0,,Meanwhile, all I wear now is this {\b1\rInternal}twin-striped kimono.
 Dialogue: 0,0:00:16.42,0:00:17.92,Main,,0,0,0,,I don't leave much of an impression,
 Dialogue: 0,0:00:17.92,0:00:20.82,Main,,0,0,0,,so I figure I'll be easier to remember if I always wear the same thing.
+
+[Graphics]
+filename: invalid.jpeg
+`^D`Y!!13E:*2A!"!1!"8A&?!!$`Y1-W28BJ:A!!45U!+A!!!!A!#A%/!!)!!!!A!!!!BA%0!!)!!!!&
+!!!!JA%1!!)!!!!'!!!!L!%3!!-!!!!"!!%!
