@@ -358,7 +358,7 @@ class AssScript(object):
         if forced_resolution:
             dst_width, dst_height = forced_resolution
         else:
-            dst_width, dst_height = other_script._sections_dict[SCRIPT_INFO_SECTION].get_resolution()
+            dst_width, dst_height = other_script._find_section(SCRIPT_INFO_SECTION).get_resolution()
         if all((src_width, src_height, dst_width, dst_height)):
             for style in itervalues(self._styles):
                 style.resample(src_width, src_height, dst_width, dst_height)
