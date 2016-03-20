@@ -180,7 +180,7 @@ class ScriptInfoSection(object):
         def to_string(self):
             if self.value is None:
                 return self.name
-            return "{0}: {1}".format(self.name, self.value)
+            return u"{0}: {1}".format(self.name, self.value)
 
     def __init__(self):
         self._lines_dict = OrderedDict()
