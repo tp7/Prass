@@ -43,7 +43,7 @@ class AssStyle(object):
         name, definition = text.split(',', 1)
         return cls(name=name.strip(), definition=definition.strip())
 
-    def resample(self, from_width, from_height, to_width, to_height, scalebordandshadow=True):
+    def resample(self, from_width, from_height, to_width, to_height, scale_border_and_shadow=True):
         scale_height = to_height / float(from_height)
         scale_width = to_width / float(from_width)
         old_ar = from_width / float(from_height)
@@ -56,7 +56,7 @@ class AssStyle(object):
         parts[1] = "%i" % (round(int(parts[1]) * scale_height))  # font size
         parts[10] = "%g" % (float(parts[10]) * horizontal_stretch)  # scale x
         parts[12] = "%g" % (float(parts[12]) * scale_width)  # spacing
-        if scalebordandshadow:
+        if scale_border_and_shadow:
             parts[15] = "%g" % (float(parts[15]) * scale_height)  # outline
             parts[16] = "%g" % (float(parts[16]) * scale_height)  # shadow
         parts[18] = "%i" % (round(float(parts[18]) * scale_width))  # margin l
@@ -216,7 +216,7 @@ class ScriptInfoSection(object):
         self.set_property("PlayResX", width)
         self.set_property("PlayResY", height)
 
-    def get_scaledbordprop(self):
+    def get_scaled_border_property(self):
         try:
             return self.get_property("ScaledBorderAndShadow")=="yes"
         except KeyError:
@@ -353,35 +353,33 @@ class AssScript(object):
     def to_ass_file(self, path):
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
             self.to_ass_stream(script)
-
+    
+    def scale_to_reference(self, reference, forced_resolution=None):
+        src_width, src_height = self._find_section(SCRIPT_INFO_SECTION).get_resolution()
+        scale_border_and_shadow = self._find_section(SCRIPT_INFO_SECTION).get_scaled_border_property()
+        if forced_resolution:
+            dst_width, dst_height = forced_resolution
+        else:
+            dst_width, dst_height = reference._find_section(SCRIPT_INFO_SECTION).get_resolution()
+        if all((src_width, src_height, dst_width, dst_height)):
+            for style in itervalues(self._styles):
+                style.resample(src_width, src_height, dst_width, dst_height, scale_border_and_shadow)
+            self._find_section(SCRIPT_INFO_SECTION).set_resolution(dst_width, dst_height)
+        else:
+            logging.info("Couldn't determine resolution, resampling disabled")
+    
     def append_styles(self, other_script, clean, resample, forced_resolution=None):
         if clean:
             self._styles.clear()
 
         if resample:
-            src_width, src_height = other_script._find_section(SCRIPT_INFO_SECTION).get_resolution()
-            scalebordandshadow = other_script._find_section(SCRIPT_INFO_SECTION).get_scaledbordprop()
+            other_script_resampled = copy.deepcopy(other_script)
+            other_script_resampled.scale_to_reference(self, forced_resolution)
             if forced_resolution:
-                dst_width, dst_height = forced_resolution
-            else:
-                dst_width, dst_height = self._find_section(SCRIPT_INFO_SECTION).get_resolution()
-            if all((src_width, src_height, dst_width, dst_height)):
-                for style in itervalues(other_script._styles):
-                    style.resample(src_width, src_height, dst_width, dst_height, scalebordandshadow)
-            else:
-                logging.info("Couldn't determine resolution, resampling disabled")
-            if forced_resolution:
-                src_width, src_height = self._find_section(SCRIPT_INFO_SECTION).get_resolution()
-                scalebordandshadow = other_script._find_section(SCRIPT_INFO_SECTION).get_scaledbordprop()
-                dst_width, dst_height = forced_resolution
-                if all((src_width, src_height, dst_width, dst_height)):
-                    for style in itervalues(self._styles):
-                        style.resample(src_width, src_height, dst_width, dst_height, scalebordandshadow)
-                    self._find_section(SCRIPT_INFO_SECTION).set_resolution(dst_width, dst_height)
-                else:
-                    logging.info("Couldn't determine resolution, resampling disabled")
-        
-        for style in itervalues(other_script._styles):
+                self.scale_to_reference(self, forced_resolution)
+        else:
+            other_script_resampled = other_script
+        for style in itervalues(other_script_resampled._styles):
             self._styles[style.name] = copy.deepcopy(style)
 
     def sort_events(self, key, descending):
