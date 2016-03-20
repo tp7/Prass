@@ -53,7 +53,7 @@ def parse_resolution_string(resolution_string):
         return 1280,720
     if resolution_string == '1080p':
         return 1920,1080
-    for separator in (':', 'x'):
+    for separator in (':', 'x', ","):
         if separator in resolution_string:
             width, _, height = resolution_string.partition(separator)
             try:
