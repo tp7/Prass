@@ -53,7 +53,7 @@ def parse_resolution_string(resolution_string):
         return 1280,720
     if resolution_string == '1080p':
         return 1920,1080
-    for separator in (':', 'x'):
+    for separator in (':', 'x', ","):
         if separator in resolution_string:
             width, _, height = resolution_string.partition(separator)
             try:
@@ -86,7 +86,7 @@ def convert_srt(input_path, output_file, encoding):
         raise PrassError("Encoding {0} doesn't exist".format(encoding))
 
 
-@cli.command('copy-styles', short_help="copy stiles from one ass script to another")
+@cli.command('copy-styles', short_help="copy styles from one ass script to another")
 @click.option("-o", "--output", "output_file", default="-", type=click.File(encoding="utf-8-sig", mode='w'))
 @click.option('--to', 'dst_file', required=True, type=click.File(encoding='utf-8-sig', mode='r'),
               help="File to copy the styles to")
