@@ -445,14 +445,14 @@ class AssScript(object):
                 closest_frame = get_closest_kf(start_frame, keyframes_list)
                 closest_time = timecodes.get_frame_time(closest_frame, timecodes.TIMESTAMP_START)
 
-                if (closest_frame > start_frame and closest_time - event.start <= kf_before_start) or \
-                        (closest_frame < start_frame and event.start - closest_time <= kf_after_start):
-                    event.start = closest_time
+                if (end_frame > closest_frame >= start_frame and closest_time - event.start <= kf_after_start) or \
+                        (closest_frame <= start_frame and event.start - closest_time <= kf_before_start):
+                    event.start = max(0, closest_time)
 
                 closest_frame = get_closest_kf(end_frame, keyframes_list) - 1
                 closest_time = timecodes.get_frame_time(closest_frame, timecodes.TIMESTAMP_END)
-                if (closest_frame > end_frame and closest_time - event.end <= kf_before_end) or \
-                        (closest_frame < end_frame and event.end - closest_time <= kf_after_end):
+                if (start_frame < closest_frame <= end_frame and event.end - closest_time <= kf_before_end) or \
+                        (closest_frame >= end_frame and closest_time - event.end <= kf_after_end):
                     event.end = closest_time
 
     def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing, drop_sections):
