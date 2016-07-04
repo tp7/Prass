@@ -71,7 +71,7 @@ def cli():
 @cli.command("convert-srt", short_help="convert srt subtitles to ass")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'))
 @click.option("--encoding", "encoding", default='utf-8-sig', help="Encoding to use for the input SRT file")
-@click.argument("input_path", type=click.Path(dir_okay=False))
+@click.argument("input_path", type=click.Path(exists=True, dir_okay=False, allow_dash=True))
 def convert_srt(input_path, output_file, encoding):
     """Convert SRT script to ASS.
 
@@ -291,14 +291,11 @@ def shift(input_file, output_file, shift_by, shift_start, shift_end):
 
 
 if __name__ == '__main__':
-    try:
-        default_map = {}
-        if not sys.stdin.isatty():
-            for command, arg_name in (("convert-srt", "input_path"), ("copy-styles", "dst_file"),
-                                      ("sort", "input_file"), ("tpp", "input_file"), ("cleanup", "input_file"),
-                                      ('shift', "input_file")):
-                default_map[command] = {arg_name: '-'}
+    default_map = {}
+    if not sys.stdin.isatty():
+        for command, arg_name in (("convert-srt", "input_path"), ("copy-styles", "dst_file"),
+                                  ("sort", "input_file"), ("tpp", "input_file"), ("cleanup", "input_file"),
+                                  ('shift', "input_file")):
+            default_map[command] = {arg_name: '-'}
 
-        cli(default_map=default_map)
-    except PrassError as e:
-        click.echo(e.message)
+    cli(default_map=default_map)

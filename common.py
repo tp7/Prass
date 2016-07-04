@@ -1,6 +1,8 @@
 import sys
 
-class PrassError(Exception):
+from click.exceptions import ClickException
+
+class PrassError(ClickException):
     pass
 
 PY2 = sys.version_info[0] == 2
