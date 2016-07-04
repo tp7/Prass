@@ -71,7 +71,7 @@ def cli():
 @cli.command("convert-srt", short_help="convert srt subtitles to ass")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'))
 @click.option("--encoding", "encoding", default='utf-8-sig', help="Encoding to use for the input SRT file")
-@click.argument("input_path", type=click.Path(dir_okay=False))
+@click.argument("input_path", type=click.Path(exists=True, dir_okay=False, allow_dash=True))
 def convert_srt(input_path, output_file, encoding):
     """Convert SRT script to ASS.
 
