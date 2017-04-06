@@ -23,7 +23,10 @@ def script_to_string(ass_script):
 
 def load_script(name):
     with codecs.open(get_script_path(name), encoding="utf-8-sig") as input_file:
-        return input_file.read()
+        script = input_file.read()
+        # Windows is weid so you need to use \n internally
+        return script.replace("\r\n", "\n")
+        
 
 
 class TestSubs(unittest.TestCase):
@@ -36,6 +39,14 @@ class TestSubs(unittest.TestCase):
 
     def test_srt_time_parsing(self):
         self.assertEqual(132150, subs.parse_srt_time("00:02:12,150"))
+
+    def test_srt_line_parsing(self):
+        self.assertEqual(subs.srt_line_to_ass('<u>underlined</u>\n 0<b>1<i>2<s> many </i>3</s>4</b>5'), 
+                        '{\\u1}underlined{\\u0}\\N 0{\\b1}1{\\i1}2{\\s1} many {\\i0}3{\\s0}4{\\b0}5')
+        self.assertEqual(subs.srt_line_to_ass('<b>bold</b>, <i>italic</i>, <s>strikeout</s>'), 
+                        '{\\b1}bold{\\b0}, {\\i1}italic{\\i0}, {\\s1}strikeout{\\s0}')
+        self.assertEqual(subs.srt_line_to_ass('<font color="#FF0000">text</font>'), 
+                        '{\\c&H0000FF&}text{\\c&HFFFFFF&}')
 
     def test_cleanup(self):
         # this test also ensures that we leave two [Graphics] sections in their proper positions

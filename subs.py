@@ -5,7 +5,12 @@ import re
 import copy
 import logging
 from collections import OrderedDict
+try:
+    import webcolors
+except:
+    webcolors = None
 
+from tools import Timecodes
 from common import PrassError, zip, map, itervalues, iterkeys, iteritems, py2_unicode_compatible
 
 
@@ -23,6 +28,24 @@ def parse_srt_time(string):
     hours, minutes, seconds, milliseconds = map(int, re.match(r"(\d+):(\d+):(\d+)\,(\d+)", string).groups())
     return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
 
+def srt_line_to_ass(line, box=False):
+    line = line.replace('\n', r'\N')
+    if '<' in line:
+        for tag in ['i', 'b', 'u', 's']:
+            line = line.replace('<%s>' % tag, '{\\%s1}' % tag)
+            line = line.replace('</%s>' % tag, '{\\%s0}' % tag)
+        while '<font color="' in line:
+            pre, color, post = re.match(r'(.*)\<font color="(.*?)"\>(.*)', line).groups()
+            if color.startswith('#'):
+                r, g, b = color[1:3], color[3:5], color[5:]
+            elif webcolors:
+                r, g, b = map(lambda x: "%02X" % x, webcolors.name_to_rgb(color))
+            else:
+                logging.warning('Can\'t parse color "%s", please install webcolors module.' % color)
+                break
+            line = pre + '{\c&H%s%s%s&}' % (b, g, r) + post
+        line = line.replace('</font>', '{\c&HFFFFFF&}')
+    return line
 
 def format_time(ms):
     cs = int(ms / 10.0)
@@ -326,10 +349,15 @@ class AssScript(object):
                 continue
             lines = srt_event.split('\n', 2)
             times = lines[1].split('-->')
+            if 'X' in times[1] or 'Y' in times[1]:
+                times[1], box = times[1].strip().split(' ', 1)
+            else:
+                box = False
+            text=srt_line_to_ass(lines[2])
             events_section.events.append(AssEvent(
                 start=parse_srt_time(times[0].rstrip()),
                 end=parse_srt_time(times[1].lstrip()),
-                text=lines[2].replace('\n', r'\N')
+                text=text
             ))
         styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
         script_info = ScriptInfoSection()
@@ -368,7 +396,7 @@ class AssScript(object):
         else:
             logging.info("Couldn't determine resolution, resampling disabled")
     
-    def append_styles(self, other_script, clean, resample, forced_resolution=None):
+    def append_styles(self, other_script, clean=False, resample=True, forced_resolution=None):
         if clean:
             self._styles.clear()
 
@@ -382,11 +410,12 @@ class AssScript(object):
         for style in itervalues(other_script_resampled._styles):
             self._styles[style.name] = copy.deepcopy(style)
 
-    def sort_events(self, key, descending):
+    def sort_events(self, key="start", descending=False):
         self._events.sort(key=key, reverse=descending)
 
-    def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
-            keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
+    def tpp(self, styles=[], lead_in=0, lead_out=0, max_overlap=0, max_gap=0, adjacent_bias=50,
+            keyframes_list=[], timecodes=Timecodes([], 24000.0/1001),
+            kf_before_start=0, kf_after_start=0, kf_before_end=0, kf_after_end=0):
 
         def get_closest_kf(frame, keyframes):
             idx = bisect.bisect_left(keyframes, frame)
@@ -455,7 +484,8 @@ class AssScript(object):
                         (closest_frame >= end_frame and closest_time - event.end <= kf_after_end):
                     event.end = closest_time
 
-    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing, drop_sections):
+    def cleanup(self, drop_comments=False, drop_empty_lines=False, drop_unused_styles=False,
+                drop_actors=False, drop_effects=False, drop_spacing=False, drop_sections=False):
         if drop_comments:
             self._events = [e for e in self._events if not e.is_comment]
 
@@ -490,9 +520,12 @@ class AssScript(object):
         if drop_sections:
             self._sections_list = [x for x in self._sections_list if x[0] not in set(drop_sections)]
 
-    def shift(self, shift, shift_start, shift_end):
+    def shift(self, shift=0, shift_start=True, shift_end=True, multiplier=1):
         for event in self._events:
             if shift_start:
                 event.start = max(event.start + shift, 0)
             if shift_end:
                 event.end = max(event.end + shift, 0)
+            if multiplier != 1:
+                event.start *= multiplier
+                event.end *= multiplier
