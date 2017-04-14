@@ -249,7 +249,7 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
         "fonts": "[Fonts]",
         "graphics": "[Graphics]",
         "aegi": "[Aegisub Project Garbage]",
-        "extradata": ["Aegisub Extradata"]
+        "extradata": "[Aegisub Extradata]"
     }
     drop_sections = [sections_map[x] for x in drop_sections]
 
