@@ -396,7 +396,7 @@ class AssScript(object):
         else:
             logging.info("Couldn't determine resolution, resampling disabled")
     
-    def append_styles(self, other_script, clean=False, resample=True, forced_resolution=None):
+    def append_styles(self, other_script, clean, resample, forced_resolution=None):
         if clean:
             self._styles.clear()
 
@@ -410,12 +410,11 @@ class AssScript(object):
         for style in itervalues(other_script_resampled._styles):
             self._styles[style.name] = copy.deepcopy(style)
 
-    def sort_events(self, key="start", descending=False):
+    def sort_events(self, key, descending):
         self._events.sort(key=key, reverse=descending)
 
-    def tpp(self, styles=[], lead_in=0, lead_out=0, max_overlap=0, max_gap=0, adjacent_bias=50,
-            keyframes_list=[], timecodes=Timecodes([], 24000.0/1001),
-            kf_before_start=0, kf_after_start=0, kf_before_end=0, kf_after_end=0):
+    def tpp(self, styles, lead_in, lead_out, max_overlap, max_gap, adjacent_bias,
+            keyframes_list, timecodes, kf_before_start, kf_after_start, kf_before_end, kf_after_end):
 
         def get_closest_kf(frame, keyframes):
             idx = bisect.bisect_left(keyframes, frame)
@@ -484,8 +483,7 @@ class AssScript(object):
                         (closest_frame >= end_frame and closest_time - event.end <= kf_after_end):
                     event.end = closest_time
 
-    def cleanup(self, drop_comments=False, drop_empty_lines=False, drop_unused_styles=False,
-                drop_actors=False, drop_effects=False, drop_spacing=False, drop_sections=False):
+    def cleanup(self, drop_comments, drop_empty_lines, drop_unused_styles, drop_actors, drop_effects, drop_spacing, drop_sections):
         if drop_comments:
             self._events = [e for e in self._events if not e.is_comment]
 
@@ -520,7 +518,7 @@ class AssScript(object):
         if drop_sections:
             self._sections_list = [x for x in self._sections_list if x[0] not in set(drop_sections)]
 
-    def shift(self, shift=0, shift_start=True, shift_end=True, multiplier=1):
+    def shift(self, shift, shift_start, shift_end, multiplier):
         for event in self._events:
             if shift_start:
                 event.start = max(event.start + shift, 0)
