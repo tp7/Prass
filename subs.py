@@ -5,7 +5,12 @@ import re
 import copy
 import logging
 from collections import OrderedDict
+try:
+    import webcolors
+except:
+    webcolors = None
 
+from tools import Timecodes
 from common import PrassError, zip, map, itervalues, iterkeys, iteritems, py2_unicode_compatible
 
 
@@ -23,6 +28,24 @@ def parse_srt_time(string):
     hours, minutes, seconds, milliseconds = map(int, re.match(r"(\d+):(\d+):(\d+)\,(\d+)", string).groups())
     return hours * 3600000 + minutes * 60000 + seconds * 1000 + milliseconds
 
+def srt_line_to_ass(line, box=False):
+    line = line.replace('\n', r'\N')
+    if '<' in line:
+        for tag in ['i', 'b', 'u', 's']:
+            line = line.replace('<%s>' % tag, '{\\%s1}' % tag)
+            line = line.replace('</%s>' % tag, '{\\%s0}' % tag)
+        while '<font color="' in line:
+            pre, color, post = re.match(r'(.*)\<font color="(.*?)"\>(.*)', line).groups()
+            if color.startswith('#'):
+                r, g, b = color[1:3], color[3:5], color[5:]
+            elif webcolors:
+                r, g, b = map(lambda x: "%02X" % x, webcolors.name_to_rgb(color))
+            else:
+                logging.warning('Can\'t parse color "%s", please install webcolors module.' % color)
+                break
+            line = pre + '{\c&H%s%s%s&}' % (b, g, r) + post
+        line = line.replace('</font>', '{\c&HFFFFFF&}')
+    return line
 
 def format_time(ms):
     cs = int(ms / 10.0)
@@ -326,10 +349,15 @@ class AssScript(object):
                 continue
             lines = srt_event.split('\n', 2)
             times = lines[1].split('-->')
+            if 'X' in times[1] or 'Y' in times[1]:
+                times[1], box = times[1].strip().split(' ', 1)
+            else:
+                box = False
+            text=srt_line_to_ass(lines[2])
             events_section.events.append(AssEvent(
                 start=parse_srt_time(times[0].rstrip()),
                 end=parse_srt_time(times[1].lstrip()),
-                text=lines[2].replace('\n', r'\N')
+                text=text
             ))
         styles_section.styles[u'Default'] = AssStyle(u'Default', 'Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1')
         script_info = ScriptInfoSection()
@@ -490,9 +518,12 @@ class AssScript(object):
         if drop_sections:
             self._sections_list = [x for x in self._sections_list if x[0] not in set(drop_sections)]
 
-    def shift(self, shift, shift_start, shift_end):
+    def shift(self, shift, shift_start, shift_end, multiplier):
         for event in self._events:
             if shift_start:
                 event.start = max(event.start + shift, 0)
             if shift_end:
                 event.end = max(event.end + shift, 0)
+            if multiplier != 1:
+                event.start *= multiplier
+                event.end *= multiplier

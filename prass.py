@@ -169,7 +169,7 @@ def sort_script(input_file, output_file, sort_by, descending):
 @click.option("--timecodes", "timecodes_path", type=click.Path(readable=True, dir_okay=False), metavar="<path>",
               help="Path to timecodes file")
 @click.option("--fps", "fps", metavar="<float>",
-              help="Fps provided as float value, in case you don't have timecodes")
+              help="Fps provided as decimal or proper fraction, in case you don't have timecodes")
 @click.option("--kf-before-start", default=0, type=float, metavar="<ms>",
               help="Max distance between a keyframe and event start for it to be snapped, when keyframe is placed before the event")
 @click.option("--kf-after-start", default=0, type=float, metavar="<ms>",
@@ -261,19 +261,26 @@ def cleanup(input_file, output_file, drop_comments, drop_empty_lines, drop_unuse
 @cli.command("shift", short_help="shift start or end times of every event")
 @click.option("-o", "--output", "output_file", default='-', type=click.File(encoding="utf-8-sig", mode='w'), metavar="<path>")
 @click.argument("input_file", type=click.File(encoding="utf-8-sig"))
-@click.option("--by", "shift_by", required=True, metavar="<time>",
+@click.option("--by", "shift_by", required=False, default="0", metavar="<time>",
               help="Time to shift. Might be negative. 10.5s, 150ms or 1:12.23 formats are allowed, seconds assumed by default")
 @click.option("--start", "shift_start", default=False, is_flag=True, help="Shift only start time")
 @click.option("--end", "shift_end", default=False, is_flag=True, help="Shift only end time")
-def shift(input_file, output_file, shift_by, shift_start, shift_end):
-    """Shift all lines in a script by defined amount.
+@click.option("--multiplier", "multiplier", default="1", 
+              help="Multiplies timings by the value to change speed. Value is a decimal or proper fraction")
+def shift(input_file, output_file, shift_by, shift_start, shift_end, multiplier):
+    """Shift all lines in a script by defined amount and/or change speed.
 
     \b
-    You can use one of the following formats to specify the time:
+    You can use one of the following formats to specify the time for shift:
         - "1.5s" or just "1.5" means 1 second 500 milliseconds
         - "150ms" means 150 milliseconds
         - "1:7:12.55" means 1 hour, 7 minutes, 12 seconds and 550 milliseconds. All parts are optional.
     Every format allows a negative sign before the value, which means "shift back", like "-12s"
+
+    \b
+    Optionally, specify multiplier to change speed:
+        - 1.2 makes subs 20% faster
+        - 7/8 makes subs 12.5% slower
 
     \b
     To shift both start end end time by one minute and 15 seconds:
@@ -285,8 +292,11 @@ def shift(input_file, output_file, shift_by, shift_start, shift_end):
         shift_start = shift_end = True
 
     shift_ms = parse_shift_string(shift_by)
+    multiplier = parse_fps_string(multiplier)
+    if multiplier<0:
+        raise PrassError('Speed multiplier should be a positive number')
     script = AssScript.from_ass_stream(input_file)
-    script.shift(shift_ms, shift_start, shift_end)
+    script.shift(shift_ms, shift_start, shift_end, multiplier)
     script.to_ass_stream(output_file)
 
 
